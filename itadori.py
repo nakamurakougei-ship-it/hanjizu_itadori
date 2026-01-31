@@ -1,3 +1,14 @@
+import sys
+from types import ModuleType
+
+# --- Python 3.12/3.13 互換性パッチ ---
+if 'distutils' not in sys.modules:
+    d = ModuleType('distutils'); d.version = ModuleType('distutils.version')
+    class LooseVersion:
+        def __init__(self, vstring): self.vstring = vstring
+        def __lt__(self, other): return False
+    d.version.LooseVersion = LooseVersion; sys.modules['distutils'] = d; sys.modules['distutils.version'] = d.version
+
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -5,15 +16,13 @@ import pandas as pd
 import base64
 import os
 
-# --- 1. アプリ設定・日本語フォント設定 ---
+# --- 1. アプリ設定・日本語豆腐文字対策 ---
 st.set_page_config(page_title="TRUNK TECH - イタドリ (棚板木取り)", layout="wide")
-
-# 日本語豆腐文字対策
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
 
-# --- 背景画像 & 視認性向上CSS ---
-def set_bg_image(image_file):
+# --- 背景画像 & 磨りガラス風CSS (Ver. 1.7 決定版) ---
+def set_design_theme(image_file):
     if os.path.exists(image_file):
         with open(image_file, "rb") as f:
             img_data = f.read()
@@ -26,39 +35,33 @@ def set_bg_image(image_file):
             background-position: center;
             background-attachment: fixed;
         }}
-        /* 1. タイトルやサブヘッダーの保護 */
-        .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown p {{
-            background-color: rgba(255, 255, 255, 0.8);
-            padding: 5px 15px;
-            border-radius: 8px;
-            display: inline-block;
-            margin-bottom: 10px;
-        }}
-        /* 2. 入力ウィジェット（ラジオボタン含む）の白背景 */
-        [data-testid="stRadio"], [data-testid="stSelectbox"], [data-testid="stNumberInput"] {{
-            background-color: rgba(255, 255, 255, 0.95) !important;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }}
-        /* 3. テーブル（大福帳・入力リスト・明細）の半透明化 */
-        [data-testid="stDataEditor"], [data-testid="stTable"] {{
+        /* 現代版の透過処理：磨りガラス効果(Blur)を追加 */
+        .main .block-container {{
             background-color: rgba(255, 255, 255, 0.75) !important;
-            padding: 10px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 3rem !important;
+            border-radius: 20px;
+            margin-top: 2rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
         }}
-        /* 各セクションの間隔調整 */
-        .stVerticalBlock {{
-            gap: 1.5rem;
+        [data-testid="stRadio"], [data-testid="stSelectbox"], [data-testid="stNumberInput"] {{
+            background-color: rgba(255, 255, 255, 0.9) !important;
+            padding: 10px;
+            border-radius: 10px;
+        }}
+        /* テーブル類も透過 */
+        [data-testid="stDataEditor"], [data-testid="stTable"] {{
+            background-color: rgba(255, 255, 255, 0.6) !important;
+            border-radius: 12px;
         }}
         </style>
         """
         st.markdown(style, unsafe_allow_html=True)
 
-set_bg_image("itadori.jpg")
+set_design_theme("itadori.jpg")
 
-# --- 2. 木取りエンジン (TrunkTechEngine) ---
+# --- 2. 木取りエンジン ---
 class TrunkTechEngine:
     def __init__(self, kerf: float = 3.0):
         self.kerf = kerf
@@ -71,13 +74,11 @@ class TrunkTechEngine:
                 for r in s['rows']:
                     if r['h'] >= p['d'] and (vw - r['used_w']) >= p['w']:
                         r['parts'].append({'n': p['n'], 'x': r['used_w'], 'y': r['y'], 'w': p['w'], 'h': p['d']})
-                        r['used_w'] += p['w'] + self.kerf
-                        return True
+                        r['used_w'] += p['w'] + self.kerf; return True
                 if (vh - s['used_h']) >= p['d']:
                     s['rows'].append({'y': s['used_h'], 'h': p['d'], 'used_w': p['w'] + self.kerf, 
                                       'parts': [{'n': p['n'], 'x': 0, 'y': s['used_h'], 'w': p['w'], 'h': p['d']}]})
-                    s['used_h'] += p['d'] + self.kerf
-                    return True
+                    s['used_h'] += p['d'] + self.kerf; return True
             return False
         for p in sorted_parts:
             if not pack(p):
@@ -86,19 +87,15 @@ class TrunkTechEngine:
                                          'parts': [{'n': p['n'], 'x': 0, 'y': 0, 'w': p['w'], 'h': p['d']}]}]})
         return sheets
 
-# --- 3. データ初期化 ---
+# --- 3. 材料マスタ（大福帳）初期化 ---
 if 'material_master' not in st.session_state:
     st.session_state.material_master = pd.DataFrame([
-        {"材料名": "ポリ板 (ホワイト)", "3x6単価": 4500, "4x8単価": 7200},
-        {"材料名": "ラワンランバー", "3x6単価": 2250, "4x8単価": 3600},
-    ])
-if 'shelf_list' not in st.session_state:
-    st.session_state.shelf_list = pd.DataFrame([
-        {"名称": "棚板A", "巾(W)": 900.0, "奥行(D)": 450.0, "枚数": 4},
-        {"名称": "棚板B", "巾(W)": 600.0, "奥行(D)": 300.0, "枚数": 6}
+        {"材料名": "ポリ板", "厚み(mm)": 2.5, "3x6単価": 4500, "4x8単価": 7200},
+        {"材料名": "ラワンランバー", "厚み(mm)": 15.0, "3x6単価": 2250, "4x8単価": 3600},
+        {"材料名": "ラワンランバー", "厚み(mm)": 21.0, "3x6単価": 3500, "4x8単価": 5100}
     ])
 
-# --- 4. UI: 大福帳セクション ---
+# --- 4. UI: セクション ---
 st.title("🌱 木取り専用アプリ：イタドリ (ITADORI)")
 
 with st.expander("📊 1. 材料リストの管理 (大福帳)"):
@@ -108,73 +105,68 @@ with st.expander("📊 1. 材料リストの管理 (大福帳)"):
     if st.button("マスタ反映"): st.session_state.material_master = edited_master; st.rerun()
 
 st.divider()
-
-# --- 5. 入力・設定エリア ---
 col_in1, col_in2 = st.columns([2, 1])
 
 with col_in1:
     st.subheader("📋 棚板リストの入力")
+    if 'shelf_list' not in st.session_state:
+        st.session_state.shelf_list = pd.DataFrame([
+            {"名称": "側板", "厚み(mm)": 15.0, "巾(W)": 900.0, "奥行(D)": 450.0, "枚数": 4},
+            {"名称": "棚板", "厚み(mm)": 15.0, "巾(W)": 600.0, "奥行(D)": 300.0, "枚数": 6}
+        ])
     shelf_df = st.data_editor(st.session_state.shelf_list, num_rows="dynamic", use_container_width=True, key="shelf_editor")
 
 with col_in2:
     st.subheader("⚙️ 設定")
-    m_list = st.session_state.material_master["材料名"].tolist()
-    selected_mat = st.selectbox("材料選択", m_list)
-    L_INFO = st.session_state.material_master[st.session_state.material_master["材料名"] == selected_mat].iloc[0]
+    # 厚みを含めた選択肢を作成
+    m_df = st.session_state.material_master.copy()
+    m_df["表示名"] = m_df.apply(lambda x: f"{x['材料名']} ({x['厚み(mm)']}mm)", axis=1)
+    sel_mat_name = st.selectbox("使用する材料 (定尺材)", m_df["表示名"].tolist())
+    L_INFO = m_df[m_df["表示名"] == sel_mat_name].iloc[0]
     
-    # 【白背景保護対象】ラジオボタン
     size_choice = st.radio("板サイズ選定", ["自動選定", "3x6固定", "4x8固定", "手動入力"])
-    
     custom_w, custom_h = 1820.0, 910.0
     if size_choice == "手動入力":
         c1, c2 = st.columns(2)
-        custom_w = c1.number_input("板長さ", value=1820.0)
-        custom_h = c2.number_input("板巾", value=910.0)
-    
+        custom_w = c1.number_input("板長さ", value=1820.0); custom_h = c2.number_input("板巾", value=910.0)
     kerf = st.number_input("刃物厚 (mm)", value=3.0, step=0.1)
 
-# --- 6. 木取り計算実行 ---
+# --- 5. 木取り計算実行 ---
 if st.button("🧮 木取り図を作成する", use_container_width=True):
+    # 選択した板厚と一致する部材のみを抽出（安全装置）
+    target_t = L_INFO["厚み(mm)"]
     all_parts = []
     for _, row in shelf_df.iterrows():
         if pd.notna(row["名称"]) and pd.notna(row["枚数"]):
-            for i in range(int(row["枚数"])):
-                all_parts.append({"n": f"{row['名称']}", "w": row["巾(W)"], "d": row["奥行(D)"]})
+            if float(row["厚み(mm)"]) == target_t:
+                for i in range(int(row["枚数"])):
+                    all_parts.append({"n": f"{row['名称']}", "w": row["巾(W)"], "d": row["奥行(D)"]})
 
     if not all_parts:
-        st.warning("棚板リストを入力してください。")
+        st.warning(f"指定した厚み({target_t}mm)の棚板がリストにありません。")
     else:
         engine = TrunkTechEngine(kerf=kerf)
         s36_dim = (1810, 900, L_INFO.get("3x6単価", 0), "3x6")
         s48_dim = (2414, 1202, L_INFO.get("4x8単価", 0), "4x8")
         
         sim_results = []
-        if size_choice == "自動選定":
-            for vw, vh, price, label in [s36_dim, s48_dim]:
-                if price > 0:
-                    sheets = engine.pack_sheets(all_parts, vw, vh)
-                    sim_results.append({"label": label, "sheets": sheets, "total_cost": len(sheets) * price, "vw": vw, "vh": vh, "price": price})
-            best = min(sim_results, key=lambda x: x["total_cost"])
-        elif size_choice == "3x6固定":
-            sheets = engine.pack_sheets(all_parts, s36_dim[0], s36_dim[1])
-            best = {"label": "3x6", "sheets": sheets, "total_cost": len(sheets) * s36_dim[2], "vw": s36_dim[0], "vh": s36_dim[1], "price": s36_dim[2]}
-        elif size_choice == "4x8固定":
-            sheets = engine.pack_sheets(all_parts, s48_dim[0], s48_dim[1])
-            best = {"label": "4x8", "sheets": sheets, "total_cost": len(sheets) * s48_dim[2], "vw": s48_dim[0], "vh": s48_dim[1], "price": s48_dim[2]}
-        else:
-            sheets = engine.pack_sheets(all_parts, custom_w - 10, custom_h - 10)
-            best = {"label": "カスタム", "sheets": sheets, "total_cost": 0, "vw": custom_w-10, "vh": custom_h-10, "price": 0}
+        test_modes = [s36_dim, s48_dim] if "自動" in size_choice else ([s36_dim] if "3x6" in size_choice else ([s48_dim] if "4x8" in size_choice else [(custom_w-10, custom_h-10, 0, "手動")]))
+
+        for vw, vh, price, label in test_modes:
+            if price >= 0:
+                sheets = engine.pack_sheets(all_parts, vw, vh)
+                sim_results.append({"label": label, "sheets": sheets, "total_cost": len(sheets) * price, "vw": vw, "vh": vh, "price": price})
+
+        best = min(sim_results, key=lambda x: x["total_cost"]) if "自動" in size_choice else sim_results[0]
 
         st.divider()
-        st.success(f"💡 木取り完了：**{best['label']}板** を **{len(best['sheets'])}枚** 使用")
-        st.markdown('<button onclick="window.print()" style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">🖨️ 画面を印刷する</button>', unsafe_allow_html=True)
+        st.success(f"💡 結果：**{L_INFO['材料名']} ({target_t}mm)** / **{best['label']}板** を **{len(best['sheets'])}枚** 使用")
 
         for s in best["sheets"]:
             fig, ax = plt.subplots(figsize=(12, 6))
-            v_w_full, v_h_full = best["vw"] + 10, best["vh"] + 10
-            ax.set_xlim(0, v_w_full); ax.set_ylim(0, v_h_full); ax.set_aspect('equal')
-            ax.add_patch(patches.Rectangle((0,0), v_w_full, v_h_full, fc='#fdf5e6', ec='#8b4513', lw=2))
-            ax.set_title(f"【{selected_mat}】 ID:{s['id']} ({int(v_w_full)}x{int(v_h_full)})", fontsize=14, fontweight='bold')
+            ax.set_xlim(0, best["vw"]+10); ax.set_ylim(0, best["vh"]+10); ax.set_aspect('equal')
+            ax.add_patch(patches.Rectangle((0,0), best["vw"]+10, best["vh"]+10, fc='#fdf5e6', ec='#8b4513', lw=2))
+            ax.set_title(f"【{L_INFO['材料名']} {target_t}mm】 ID:{s['id']} ({best['label']})", fontsize=14, fontweight='bold')
             for r in s['rows']:
                 for p in r['parts']:
                     ax.add_patch(patches.Rectangle((p['x'],p['y']), p['w'], p['h'], lw=1, ec='black', fc='#deb887', alpha=0.8))
@@ -183,10 +175,10 @@ if st.button("🧮 木取り図を作成する", use_container_width=True):
 
         st.subheader("📋 積算見積明細")
         bill_df = pd.DataFrame([
-            {"項目": "使用材料", "内容": f"{selected_mat}"},
+            {"項目": "使用材料", "内容": f"{L_INFO['材料名']} ({target_t}mm)"},
             {"項目": "板サイズ", "内容": f"{best['label']}"},
             {"項目": "単価", "内容": f"{int(best['price']):,} 円"},
             {"項目": "必要枚数", "内容": f"{len(best['sheets'])} 枚"},
-            {"項目": "合計材料費", "内容": f"{int(best['total_cost']):,} 円"}
+            {"項目": "合計材料費", "内容": f"**{int(best['total_cost']):,} 円**"}
         ])
         st.table(bill_df)
