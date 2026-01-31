@@ -21,7 +21,7 @@ st.set_page_config(page_title="TRUNK TECH - イタドリ (棚板木取り)", lay
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
 
-# --- 背景画像 & 磨りガラス風CSS (Ver. 1.8 修正版) ---
+# --- 背景画像 & 磨りガラス風CSS ---
 def set_design_theme(image_file):
     if os.path.exists(image_file):
         with open(image_file, "rb") as f:
@@ -35,7 +35,6 @@ def set_design_theme(image_file):
             background-position: center;
             background-attachment: fixed;
         }}
-        /* 【修正】メインコンテンツの背景透過を強化 */
         [data-testid="stAppViewBlockContainer"] {{
             background-color: rgba(255, 255, 255, 0.78) !important;
             backdrop-filter: blur(10px) !important;
@@ -45,14 +44,8 @@ def set_design_theme(image_file):
             margin-top: 2rem;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
         }}
-        /* 入力エリアの視認性確保 */
-        [data-testid="stWidgetLabel"] p {{
-            color: #000 !important;
-            font-weight: bold !important;
-        }}
-        [data-testid="stHeader"] {{
-            background-color: rgba(0,0,0,0) !important;
-        }}
+        [data-testid="stWidgetLabel"] p {{ color: #000 !important; font-weight: bold !important; }}
+        [data-testid="stHeader"] {{ background-color: rgba(0,0,0,0) !important; }}
         </style>
         """
         st.markdown(style, unsafe_allow_html=True)
@@ -63,7 +56,6 @@ set_design_theme("itadori.jpg")
 class TrunkTechEngine:
     def __init__(self, kerf: float = 3.0):
         self.kerf = kerf
-
     def pack_sheets(self, parts, vw, vh):
         sorted_parts = sorted(parts, key=lambda x: (x['w'], x['d']), reverse=True)
         sheets = []
@@ -85,34 +77,43 @@ class TrunkTechEngine:
                                          'parts': [{'n': p['n'], 'x': 0, 'y': 0, 'w': p['w'], 'h': p['d']}]}]})
         return sheets
 
-# --- 3. データ初期化 & 【重要】KeyError対策のマイグレーション ---
+# --- 3. データ初期化とマイグレーション ---
+def migrate_df(df):
+    """古い形式のデータを最新の形式に自動変換する"""
+    if "厚み(mm)" not in df.columns: df["厚み(mm)"] = 15.0
+    if "材料名" not in df.columns: df["材料名"] = "未設定"
+    return df
+
 if 'material_master' not in st.session_state:
     st.session_state.material_master = pd.DataFrame([
         {"材料名": "ポリ板", "厚み(mm)": 2.5, "3x6単価": 4500, "4x8単価": 7200},
         {"材料名": "ラワンランバー", "厚み(mm)": 15.0, "3x6単価": 2250, "4x8単価": 3600},
         {"材料名": "ラワンランバー", "厚み(mm)": 21.0, "3x6単価": 3500, "4x8単価": 5100}
     ])
-else:
-    # 古いセッションデータに「厚み(mm)」がない場合の補完
-    if "厚み(mm)" not in st.session_state.material_master.columns:
-        st.session_state.material_master["厚み(mm)"] = 15.0
+st.session_state.material_master = migrate_df(st.session_state.material_master)
 
 if 'shelf_list' not in st.session_state:
     st.session_state.shelf_list = pd.DataFrame([
         {"名称": "側板", "厚み(mm)": 15.0, "巾(W)": 900.0, "奥行(D)": 450.0, "枚数": 4},
         {"名称": "棚板", "厚み(mm)": 15.0, "巾(W)": 600.0, "奥行(D)": 300.0, "枚数": 6}
     ])
-else:
-    if "厚み(mm)" not in st.session_state.shelf_list.columns:
-        st.session_state.shelf_list["厚み(mm)"] = 15.0
+st.session_state.shelf_list = migrate_df(st.session_state.shelf_list)
 
 # --- 4. UI: 大福帳セクション ---
 st.title("🌱 木取り専用アプリ：イタドリ (ITADORI)")
 
 with st.expander("📊 1. 材料リストの管理 (大福帳)"):
-    uploaded_file = st.file_uploader("材料リスト(CSV)読込", type="csv")
-    if uploaded_file: 
-        st.session_state.material_master = pd.read_csv(uploaded_file)
+    uploaded_file = st.file_uploader("材料リスト(CSV)読込 ※Excel形式CSV対応", type="csv")
+    if uploaded_file:
+        # 【解決策】複数の文字コードを試して読み込む
+        for enc in ["utf-8-sig", "cp932", "shift-jis"]:
+            try:
+                uploaded_file.seek(0)
+                new_df = pd.read_csv(uploaded_file, encoding=enc)
+                st.session_state.material_master = migrate_df(new_df)
+                st.success(f"CSVを読み込みました ({enc})")
+                break
+            except: continue
         st.rerun()
     
     edited_master = st.data_editor(st.session_state.material_master, num_rows="dynamic", use_container_width=True)
@@ -129,9 +130,9 @@ with col_in1:
 with col_in2:
     st.subheader("⚙️ 設定")
     m_df = st.session_state.material_master.copy()
-    # 【KeyError回避策】安全に表示名を作成
-    m_df["表示名"] = m_df.apply(lambda x: f"{x.get('材料名', '未設定')} ({x.get('厚み(mm)', 0)}mm)", axis=1)
-    sel_mat_name = st.selectbox("材料選択 (定尺材)", m_df["表示名"].tolist())
+    # 【安全策】項目の存在を確認してから表示名を作成
+    m_df["表示名"] = m_df.apply(lambda x: f"{x.get('材料名', '不明')} ({x.get('厚み(mm)', 0)}mm)", axis=1)
+    sel_mat_name = st.selectbox("材料選択", m_df["表示名"].tolist())
     L_INFO = m_df[m_df["表示名"] == sel_mat_name].iloc[0]
     
     size_choice = st.radio("板サイズ選定", ["自動選定", "3x6固定", "4x8固定", "手動入力"])
@@ -147,10 +148,13 @@ if st.button("🧮 木取り図を作成する", use_container_width=True):
     all_parts = []
     for _, row in shelf_df.iterrows():
         if pd.notna(row.get("名称")) and pd.notna(row.get("枚数")):
-            # 板厚が一致するパーツのみ抽出
-            if float(row.get("厚み(mm)", 0)) == target_t:
-                for i in range(int(row["枚数"])):
-                    all_parts.append({"n": f"{row['名称']}", "w": row["巾(W)"], "d": row["奥行(D)"]})
+            # 厚みが一致する部材のみ抽出
+            try:
+                row_t = float(row.get("厚み(mm)", 0))
+                if row_t == target_t:
+                    for i in range(int(row["枚数"])):
+                        all_parts.append({"n": f"{row['名称']}", "w": row["巾(W)"], "d": row["奥行(D)"]})
+            except: continue
 
     if not all_parts:
         st.warning(f"厚み {target_t}mm の部材がリストにありません。")
@@ -158,15 +162,12 @@ if st.button("🧮 木取り図を作成する", use_container_width=True):
         engine = TrunkTechEngine(kerf=kerf)
         s36_dim = (1810, 900, L_INFO.get("3x6単価", 0), "3x6")
         s48_dim = (2414, 1202, L_INFO.get("4x8単価", 0), "4x8")
-        
         sim_results = []
         test_modes = [s36_dim, s48_dim] if "自動" in size_choice else ([s36_dim] if "3x6" in size_choice else ([s48_dim] if "4x8" in size_choice else [(custom_w-10, custom_h-10, 0, "手動")]))
-
         for vw, vh, price, label in test_modes:
             if price >= 0:
                 sheets = engine.pack_sheets(all_parts, vw, vh)
                 sim_results.append({"label": label, "sheets": sheets, "total_cost": len(sheets) * price, "vw": vw, "vh": vh, "price": price})
-
         best = min(sim_results, key=lambda x: x["total_cost"]) if "自動" in size_choice else sim_results[0]
 
         st.divider()
