@@ -21,7 +21,7 @@ st.set_page_config(page_title="TRUNK TECH - イタドリ (棚板木取り)", lay
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
 
-# --- 背景画像 & 磨りガラス風CSS ---
+# --- 背景画像 & 磨りガラス風CSS (Ver. 2.2 決定版) ---
 def set_design_theme(image_file):
     if os.path.exists(image_file):
         with open(image_file, "rb") as f:
@@ -35,18 +35,21 @@ def set_design_theme(image_file):
             background-position: center;
             background-attachment: fixed;
         }}
+        /* メインブロックの透過：透明度とぼかしを最適化 */
         [data-testid="stAppViewBlockContainer"] {{
-            background-color: rgba(255, 255, 255, 0.75) !important;
-            backdrop-filter: blur(10px) !important;
-            -webkit-backdrop-filter: blur(10px) !important;
+            background-color: rgba(255, 255, 255, 0.72) !important;
+            backdrop-filter: blur(12px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
             padding: 3rem !important;
-            border-radius: 20px;
+            border-radius: 30px;
             margin-top: 2rem;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }}
-        [data-testid="stSidebar"], [data-testid="stRadio"], [data-testid="stSelectbox"] {{
+        /* ウィジェットの視認性確保 */
+        [data-testid="stSidebar"], [data-testid="stRadio"], [data-testid="stSelectbox"], .stNumberInput {{
             background-color: rgba(255, 255, 255, 0.9) !important;
-            border-radius: 10px;
+            border-radius: 12px;
         }}
         </style>
         """
@@ -79,41 +82,50 @@ class TrunkTechEngine:
                                          'parts': [{'n': p['n'], 'x': 0, 'y': 0, 'w': p['w'], 'h': p['d']}]}]})
         return sheets
 
-# --- 3. データ初期化とマイグレーション (Ver 2.1 強化) ---
-def clean_df(df):
-    """カラム名を整理し、不足分を補完する"""
-    # 1. 類似カラム名の名寄せ
-    mapping = {"厚み(mm)": "厚み", "材料": "材料名"}
+# --- 3. データ整理・救済ロジック ---
+def clean_df_master(df):
+    """大福帳の形式を厳格に整える"""
+    # ユーザーが求める 4項目構成
+    target_cols = ["材料名", "厚み", "3x6単価", "4x8単価"]
+    # 類似名の名寄せ
+    mapping = {"厚み(mm)": "厚み", "材料": "材料名", "単価3x6": "3x6単価", "単価4x8": "4x8単価"}
     df = df.rename(columns=mapping)
-    # 2. 必須4カラムの確保
-    cols = ["材料名", "厚み", "3x6単価", "4x8単価"]
-    for c in cols:
+    # 存在しないカラムを0で補完
+    for c in target_cols:
         if c not in df.columns: df[c] = 0
-    return df[cols] # 順番も固定
+    return df[target_cols].fillna(0)
 
+# 初期状態の定義
 if 'material_master' not in st.session_state:
     st.session_state.material_master = pd.DataFrame([
         {"材料名": "ポリ板", "厚み": 2.5, "3x6単価": 4500, "4x8単価": 7200},
         {"材料名": "ラワンランバー", "厚み": 15.0, "3x6単価": 2250, "4x8単価": 3600}
     ])
-st.session_state.material_master = clean_df(st.session_state.material_master)
 
 # --- 4. UI: 大福帳セクション ---
 st.title("🌱 木取り専用アプリ：イタドリ (ITADORI)")
 
 with st.expander("📊 1. 材料リストの管理 (大福帳)"):
     st.info("項目：| 材料名 | 厚み | 3x6単価 | 4x8単価 |")
-    up_file = st.file_uploader("材料リスト(CSV)読込 ※Excel形式CSV対応", type="csv")
+    up_file = st.file_uploader("材料リスト(CSV)読込 ※Excel/文字化け対応", type="csv")
+    
     if up_file:
-        for enc in ["utf-8-sig", "cp932"]:
+        for enc in ["utf-8-sig", "cp932", "shift-jis"]:
             try:
                 up_file.seek(0)
-                new_df = pd.read_csv(up_file, encoding=enc)
-                st.session_state.material_master = clean_df(new_df)
-                st.rerun()
+                temp_df = pd.read_csv(up_file, encoding=enc)
+                if not temp_df.empty:
+                    st.session_state.material_master = clean_df_master(temp_df)
+                    st.success(f"CSV読込成功 ({enc})")
+                    st.rerun() # ここでリフレッシュ
             except: continue
-    
-    st.session_state.material_master = st.data_editor(st.session_state.material_master, num_rows="dynamic", use_container_width=True)
+
+    st.session_state.material_master = st.data_editor(
+        st.session_state.material_master, 
+        num_rows="dynamic", 
+        use_container_width=True,
+        key="master_editor"
+    )
 
 st.divider()
 col_in1, col_in2 = st.columns([2, 1])
@@ -130,7 +142,6 @@ with col_in1:
 with col_in2:
     st.subheader("⚙️ 設定")
     m_df = st.session_state.material_master.copy()
-    # 【修正】x.get() を使って KeyError を物理的に回避
     m_df["表示名"] = m_df.apply(lambda x: f"{x.get('材料名', '未設定')} ({x.get('厚み', 0)}mm)", axis=1)
     sel_mat_name = st.selectbox("使用材料", m_df["表示名"].tolist())
     L_INFO = m_df[m_df["表示名"] == sel_mat_name].iloc[0]
@@ -158,8 +169,8 @@ if st.button("🧮 木取り図を作成する", use_container_width=True):
         st.warning(f"厚み {target_t}mm の部材がリストにありません。")
     else:
         engine = TrunkTechEngine(kerf=kerf)
-        s36_dim = (c_s36_w - 10, c_s36_h - 10, L_INFO["3x6単価"], "3x6")
-        s48_dim = (c_s48_w - 10, c_s48_h - 10, L_INFO["4x8単価"], "4x8")
+        s36_dim = (c_s36_w - 10, c_s36_h - 10, L_INFO.get("3x6単価", 0), "3x6")
+        s48_dim = (c_s48_w - 10, c_s48_h - 10, L_INFO.get("4x8単価", 0), "4x8")
         
         sim_results = []
         test_modes = [s36_dim, s48_dim] if "自動" in size_choice else ([s36_dim] if "3x6" in size_choice else ([s48_dim] if "4x8" in size_choice else [(manual_w-10, manual_h-10, 0, "手動")]))
@@ -170,12 +181,11 @@ if st.button("🧮 木取り図を作成する", use_container_width=True):
         best = min(sim_results, key=lambda x: x["total_cost"]) if "自動" in size_choice else sim_results[0]
 
         st.divider()
-        st.success(f"💡 木取り完了：**{L_INFO['材料名']} ({target_t}mm)** / **{best['label']}板**")
+        st.success(f"💡 木取り完了：**{L_INFO['材料名']} ({target_t}mm)**")
         for s in best["sheets"]:
             fig, ax = plt.subplots(figsize=(12, 6))
-            v_w_full, v_h_full = best["vw"] + 10, best["vh"] + 10
-            ax.set_xlim(0, v_w_full); ax.set_ylim(0, v_h_full); ax.set_aspect('equal')
-            ax.add_patch(patches.Rectangle((0,0), v_w_full, v_h_full, fc='#fdf5e6', ec='#8b4513', lw=2))
+            ax.set_xlim(0, best["vw"]+10); ax.set_ylim(0, best["vh"]+10); ax.set_aspect('equal')
+            ax.add_patch(patches.Rectangle((0,0), best["vw"]+10, best["vh"]+10, fc='#fdf5e6', ec='#8b4513', lw=2))
             ax.set_title(f"【{L_INFO['材料名']} {target_t}mm】 ID:{s['id']}")
             for r in s['rows']:
                 for p in r['parts']:
