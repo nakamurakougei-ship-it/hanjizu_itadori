@@ -1,25 +1,37 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-import japanize_matplotlib
 import pandas as pd
+import sys
+
+# --- 【修正ポイント】Python 3.12/3.13 互換性パッチ ---
+# japanize_matplotlib が内部で使う古い機能をダミーで補います
+try:
+    import japanize_matplotlib
+except ImportError:
+    pass
+except Exception:
+    # distutilsエラーを回避するための設定
+    plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'IPAexGothic', 'Noto Sans CJK JP', 'Arial Unicode MS']
 
 # --- 1. アプリ設定 ---
 st.set_page_config(page_title="TRUNK TECH - 棚板木取り", layout="wide")
 
-# --- 2. 木取りエンジン ---
+# --- 2. 木取りエンジン (TrunkTechEngine) ---
 class TrunkTechEngine:
     def __init__(self, kerf: float = 3.0):
         self.kerf = kerf  # 刃厚
 
     def pack_sheets(self, parts, vw, vh):
-        # 面積の大きい順にソート
+        # 面積の大きい順にソート（大きい板から埋める定石）
         sorted_parts = sorted(parts, key=lambda x: (x['w'], x['d']), reverse=True)
         sheets = []
 
         def pack(p):
             for s in sheets:
                 for r in s['rows']:
+                    # 回転させず、巾(w)と奥行(d)が収まるかチェック
                     if r['h'] >= p['d'] and (vw - r['used_w']) >= p['w']:
                         r['parts'].append({'n': p['name'], 'x': r['used_w'], 'y': r['y'], 'w': p['w'], 'h': p['d']})
                         r['used_w'] += p['w'] + self.kerf
@@ -63,9 +75,8 @@ with col_in1:
     if 'shelf_list' not in st.session_state:
         st.session_state.shelf_list = pd.DataFrame([
             {"名称": "棚板A", "巾(W)": 900.0, "奥行(D)": 450.0, "枚数": 4},
-            {"名称": "棚板B", "巾(W)": 600.0, "奥行(D)": 300.0, "枚数": 6} # 修正: 枚_数 -> 枚数
+            {"名称": "棚板B", "巾(W)": 600.0, "奥行(D)": 300.0, "枚数": 6}
         ])
-    
     shelf_df = st.data_editor(st.session_state.shelf_list, num_rows="dynamic", use_container_width=True, key="shelf_editor")
 
 with col_in2:
@@ -81,9 +92,7 @@ with col_in2:
 # --- 5. 木取り計算実行 ---
 if st.button("🧮 木取り図を作成する"):
     all_parts = []
-    # 各行のデータを安全に読み込む
     for _, row in shelf_df.iterrows():
-        # 名称、巾、奥行、枚数がすべて入力されているか確認
         if pd.notna(row["名称"]) and pd.notna(row["枚数"]):
             for i in range(int(row["枚数"])):
                 all_parts.append({"name": f"{row['名称']}-{i+1}", "w": row["巾(W)"], "d": row["奥行(D)"]})
@@ -93,7 +102,7 @@ if st.button("🧮 木取り図を作成する"):
     else:
         engine = TrunkTechEngine(kerf=kerf)
         
-        # 板寸法の定義 (マージン10mm)
+        # 定尺寸法の定義 (有効巾を設定)
         s36_dim = (1810, 900, L_INFO["3x6単価"], "3x6")
         s48_dim = (2414, 1202, L_INFO["4x8単価"], "4x8")
         
@@ -102,12 +111,8 @@ if st.button("🧮 木取り図を作成する"):
             if price > 0:
                 sheets = engine.pack_sheets(all_parts, vw, vh)
                 sim_results.append({
-                    "label": label, 
-                    "sheets": sheets, 
-                    "total_cost": len(sheets) * price, 
-                    "vw_full": vw + 10, "vh_full": vh + 10, 
-                    "vw_eff": vw, "vh_eff": vh,
-                    "price": price
+                    "label": label, "sheets": sheets, "total_cost": len(sheets) * price, 
+                    "vw_full": vw + 10, "vh_full": vh + 10, "price": price
                 })
 
         if "自動" in size_mode:
@@ -123,7 +128,7 @@ if st.button("🧮 木取り図を作成する"):
             fig, ax = plt.subplots(figsize=(12, 6))
             ax.set_xlim(0, best["vw_full"]); ax.set_ylim(0, best["vh_full"]); ax.set_aspect('equal')
             ax.add_patch(patches.Rectangle((0,0), best["vw_full"], best["vh_full"], fc='#fdf5e6', ec='#8b4513', lw=2))
-            ax.set_title(f"【{selected_mat}】 {best['label']} ID:{s['id']}")
+            ax.set_title(f"【{selected_mat}】 {best['label']} ID:{s['id']}", fontsize=14)
             
             for r in s['rows']:
                 for p in r['parts']:
