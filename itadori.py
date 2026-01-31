@@ -5,14 +5,14 @@ import pandas as pd
 import base64
 
 # --- 1. アプリ設定・日本語フォントパッチ ---
-st.set_page_config(page_title="TRUNK TECH - イタドリ (棚板木取り)", layout="wide")
+st.set_page_config(page_title=イタドリ(木取りアプリ), layout="wide")
 
 # 日本語豆腐文字対策
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
 
 # --- 【新機能】背景画像設定用関数 ---
-def set_bg_image(image_file):
+def set_bg_image(itadori.jpg):
     with open(image_file, "rb") as f:
         img_data = f.read()
     b64_encoded = base64.b64encode(img_data).decode()
@@ -167,3 +167,4 @@ if st.button("🧮 木取り図を作成する"):
         st.table(pd.DataFrame([{"項目": "使用材料", "内容": f"{selected_mat} ({best['label']})"},
                                {"項目": "総枚数", "内容": f"{len(best['sheets'])}枚"},
                                {"項目": "合計金額", "内容": f"{int(best['total_cost']):,}円"}]))
+
