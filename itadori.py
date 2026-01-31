@@ -21,7 +21,7 @@ st.set_page_config(page_title="TRUNK TECH - イタドリ (棚板木取り)", lay
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
 
-# --- 背景画像 & 磨りガラス風CSS (Ver. 2.2 決定版) ---
+# --- 背景画像 & 磨りガラス風CSS ---
 def set_design_theme(image_file):
     if os.path.exists(image_file):
         with open(image_file, "rb") as f:
@@ -35,22 +35,17 @@ def set_design_theme(image_file):
             background-position: center;
             background-attachment: fixed;
         }}
-        /* メインブロックの透過：透明度とぼかしを最適化 */
         [data-testid="stAppViewBlockContainer"] {{
-            background-color: rgba(255, 255, 255, 0.72) !important;
-            backdrop-filter: blur(12px) saturate(180%) !important;
-            -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
+            background-color: rgba(255, 255, 255, 0.78) !important;
+            backdrop-filter: blur(10px) !important;
+            -webkit-backdrop-filter: blur(10px) !important;
             padding: 3rem !important;
-            border-radius: 30px;
+            border-radius: 25px;
             margin-top: 2rem;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
         }}
-        /* ウィジェットの視認性確保 */
-        [data-testid="stSidebar"], [data-testid="stRadio"], [data-testid="stSelectbox"], .stNumberInput {{
-            background-color: rgba(255, 255, 255, 0.9) !important;
-            border-radius: 12px;
-        }}
+        [data-testid="stWidgetLabel"] p {{ color: #000 !important; font-weight: bold !important; }}
+        [data-testid="stHeader"] {{ background-color: rgba(0,0,0,0) !important; }}
         </style>
         """
         st.markdown(style, unsafe_allow_html=True)
@@ -82,20 +77,7 @@ class TrunkTechEngine:
                                          'parts': [{'n': p['n'], 'x': 0, 'y': 0, 'w': p['w'], 'h': p['d']}]}]})
         return sheets
 
-# --- 3. データ整理・救済ロジック ---
-def clean_df_master(df):
-    """大福帳の形式を厳格に整える"""
-    # ユーザーが求める 4項目構成
-    target_cols = ["材料名", "厚み", "3x6単価", "4x8単価"]
-    # 類似名の名寄せ
-    mapping = {"厚み(mm)": "厚み", "材料": "材料名", "単価3x6": "3x6単価", "単価4x8": "4x8単価"}
-    df = df.rename(columns=mapping)
-    # 存在しないカラムを0で補完
-    for c in target_cols:
-        if c not in df.columns: df[c] = 0
-    return df[target_cols].fillna(0)
-
-# 初期状態の定義
+# --- 3. データ初期化と形式統一 ---
 if 'material_master' not in st.session_state:
     st.session_state.material_master = pd.DataFrame([
         {"材料名": "ポリ板", "厚み": 2.5, "3x6単価": 4500, "4x8単価": 7200},
@@ -106,26 +88,20 @@ if 'material_master' not in st.session_state:
 st.title("🌱 木取り専用アプリ：イタドリ (ITADORI)")
 
 with st.expander("📊 1. 材料リストの管理 (大福帳)"):
-    st.info("項目：| 材料名 | 厚み | 3x6単価 | 4x8単価 |")
-    up_file = st.file_uploader("材料リスト(CSV)読込 ※Excel/文字化け対応", type="csv")
+    st.info("形式：| 材料名 | 厚み | 3x6単価 | 4x8単価 |")
     
-    if up_file:
-        for enc in ["utf-8-sig", "cp932", "shift-jis"]:
-            try:
-                up_file.seek(0)
-                temp_df = pd.read_csv(up_file, encoding=enc)
-                if not temp_df.empty:
-                    st.session_state.material_master = clean_df_master(temp_df)
-                    st.success(f"CSV読込成功 ({enc})")
-                    st.rerun() # ここでリフレッシュ
-            except: continue
-
-    st.session_state.material_master = st.data_editor(
-        st.session_state.material_master, 
-        num_rows="dynamic", 
-        use_container_width=True,
-        key="master_editor"
-    )
+    col_csv1, col_csv2 = st.columns(2)
+    with col_csv1:
+        uploaded_file = st.file_uploader("材料リスト(CSV)を読み込む", type="csv")
+        if uploaded_file: 
+            st.session_state.material_master = pd.read_csv(uploaded_file)
+            st.rerun()
+    with col_csv2:
+        # 正しい形式のCSVをダウンロードさせる
+        template_csv = st.session_state.material_master.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("正しいCSV形式をダウンロード", data=template_csv, file_name="itadori_master_template.csv", mime="text/csv")
+    
+    st.session_state.material_master = st.data_editor(st.session_state.material_master, num_rows="dynamic", use_container_width=True)
 
 st.divider()
 col_in1, col_in2 = st.columns([2, 1])
@@ -141,18 +117,22 @@ with col_in1:
 
 with col_in2:
     st.subheader("⚙️ 設定")
+    # 材料選択
     m_df = st.session_state.material_master.copy()
     m_df["表示名"] = m_df.apply(lambda x: f"{x.get('材料名', '未設定')} ({x.get('厚み', 0)}mm)", axis=1)
     sel_mat_name = st.selectbox("使用材料", m_df["表示名"].tolist())
     L_INFO = m_df[m_df["表示名"] == sel_mat_name].iloc[0]
     
+    # 【移動】定尺寸法の設定エリア
+    st.markdown("---")
     st.caption("定尺寸法の定義 (mm)")
     c_s36_w = st.number_input("3x6 長さ", value=1820.0); c_s36_h = st.number_input("3x6 巾", value=910.0)
     c_s48_w = st.number_input("4x8 長さ", value=2440.0); c_s48_h = st.number_input("4x8 巾", value=1220.0)
     
-    size_choice = st.radio("選定モード", ["自動選定", "3x6固定", "4x8固定", "手動入力"])
+    st.markdown("---")
+    size_choice = st.radio("板サイズ選定", ["自動選定", "3x6固定", "4x8固定", "手動入力"])
     if size_choice == "手動入力":
-        manual_w = st.number_input("長さ", value=1820.0); manual_h = st.number_input("巾", value=910.0)
+        manual_w = st.number_input("板長さ(手動)", value=1820.0); manual_h = st.number_input("板巾(手動)", value=910.0)
     kerf = st.number_input("刃物厚 (mm)", value=3.0, step=0.1)
 
 # --- 5. 木取り計算実行 ---
@@ -161,12 +141,13 @@ if st.button("🧮 木取り図を作成する", use_container_width=True):
     all_parts = []
     for _, row in st.session_state.shelf_list.iterrows():
         if pd.notna(row.get("名称")) and pd.notna(row.get("枚数")):
+            # 厚みが一致するものだけを抽出
             if float(row.get("厚み", 0)) == target_t:
                 for i in range(int(row["枚数"])):
                     all_parts.append({"n": f"{row['名称']}", "w": row["巾(W)"], "d": row["奥行(D)"]})
 
     if not all_parts:
-        st.warning(f"厚み {target_t}mm の部材がリストにありません。")
+        st.warning(f"厚み {target_t}mm の部材が棚板リストにありません。厚みを合わせてください。")
     else:
         engine = TrunkTechEngine(kerf=kerf)
         s36_dim = (c_s36_w - 10, c_s36_h - 10, L_INFO.get("3x6単価", 0), "3x6")
@@ -174,19 +155,23 @@ if st.button("🧮 木取り図を作成する", use_container_width=True):
         
         sim_results = []
         test_modes = [s36_dim, s48_dim] if "自動" in size_choice else ([s36_dim] if "3x6" in size_choice else ([s48_dim] if "4x8" in size_choice else [(manual_w-10, manual_h-10, 0, "手動")]))
+
         for vw, vh, price, label in test_modes:
             if price >= 0:
                 sheets = engine.pack_sheets(all_parts, vw, vh)
                 sim_results.append({"label": label, "sheets": sheets, "total_cost": len(sheets) * price, "vw": vw, "vh": vh, "price": price})
+
         best = min(sim_results, key=lambda x: x["total_cost"]) if "自動" in size_choice else sim_results[0]
 
         st.divider()
-        st.success(f"💡 木取り完了：**{L_INFO['材料名']} ({target_t}mm)**")
+        st.success(f"💡 木取り完了：**{L_INFO['材料名']} ({target_t}mm)** / **{best['label']}板** を **{len(best['sheets'])}枚** 使用")
+
         for s in best["sheets"]:
             fig, ax = plt.subplots(figsize=(12, 6))
-            ax.set_xlim(0, best["vw"]+10); ax.set_ylim(0, best["vh"]+10); ax.set_aspect('equal')
-            ax.add_patch(patches.Rectangle((0,0), best["vw"]+10, best["vh"]+10, fc='#fdf5e6', ec='#8b4513', lw=2))
-            ax.set_title(f"【{L_INFO['材料名']} {target_t}mm】 ID:{s['id']}")
+            v_w_full, v_h_full = best["vw"] + 10, best["vh"] + 10
+            ax.set_xlim(0, v_w_full); ax.set_ylim(0, v_h_full); ax.set_aspect('equal')
+            ax.add_patch(patches.Rectangle((0,0), v_w_full, v_h_full, fc='#fdf5e6', ec='#8b4513', lw=2))
+            ax.set_title(f"【{L_INFO['材料名']} {target_t}mm】 ID:{s['id']} ({best['label']})", fontsize=14, fontweight='bold')
             for r in s['rows']:
                 for p in r['parts']:
                     ax.add_patch(patches.Rectangle((p['x'],p['y']), p['w'], p['h'], lw=1, ec='black', fc='#deb887', alpha=0.8))
@@ -197,5 +182,7 @@ if st.button("🧮 木取り図を作成する", use_container_width=True):
         st.table(pd.DataFrame([
             {"項目": "使用材料", "内容": f"{L_INFO['材料名']} ({target_t}mm)"},
             {"項目": "板サイズ", "内容": f"{best['label']} ({int(best['vw']+10)}x{int(best['vh']+10)})"},
+            {"項目": "単価", "内容": f"{int(best['price']):,} 円"},
+            {"項目": "必要枚数", "内容": f"{len(best['sheets'])} 枚"},
             {"項目": "合計材料費", "内容": f"**{int(best['total_cost']):,} 円**"}
         ]))
