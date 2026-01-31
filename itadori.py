@@ -85,9 +85,9 @@ if 'material_master' not in st.session_state:
     ])
 
 # --- 4. UIセクション ---
-st.title("🌱 木取り専用アプリ：イタドリ (ITADORI)")
+st.title("木取り専用アプリ：イタドリ")
 
-with st.expander("📊 1. 材料リストの管理 (大福帳)"):
+with st.expander(" 1. 材料リストの管理"):
     uploaded_master = st.file_uploader("材料リスト(CSV)を読み込む", type="csv")
     if uploaded_master:
         st.session_state.material_master = pd.read_csv(uploaded_master)
@@ -99,7 +99,7 @@ st.divider()
 col_in1, col_in2 = st.columns([2, 1])
 
 with col_in1:
-    st.subheader("📋 棚板リストの入力")
+    st.subheader("棚板リストの入力")
     if 'shelf_list' not in st.session_state:
         st.session_state.shelf_list = pd.DataFrame([
             {"名称": "棚板A", "巾(W)": 900.0, "奥行(D)": 450.0, "枚数": 4},
@@ -122,7 +122,7 @@ with col_in2:
     kerf = st.number_input("刃物厚 (mm)", value=3.0, step=0.1)
 
 # --- 5. 木取り計算実行 ---
-if st.button("🧮 木取り図を作成する"):
+if st.button("木取り図を作成する"):
     all_parts = []
     for _, row in shelf_df.iterrows():
         if pd.notna(row["名称"]) and pd.notna(row["枚数"]):
@@ -173,3 +173,4 @@ if st.button("🧮 木取り図を作成する"):
             {"項目": "合計金額", "内容": f"**{int(best['total_cost']):,} 円**"}
         ]
         st.table(pd.DataFrame(bill_data))
+
