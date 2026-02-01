@@ -130,8 +130,6 @@ class TrunkTechEngine:
 st.title("イタドリ")
 st.write("定尺板から効率よく木取りを行うためのアプリです。")
 
-st.divider()
-
 # 左寄せ・縦並び：設定 → 板材リスト。左カラム幅は CSS で 500px 固定（main_layout_500）
 with st.container(key="main_layout_500"):
     col_main, col_right = st.columns([3, 1])
