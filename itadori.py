@@ -41,13 +41,30 @@ def set_design_theme(image_file):
             background-position: center;
             background-attachment: fixed;
         }}
-        /* メインコンテンツエリアを真っ白（不透明）にして視認性を100%確保 */
-        [data-testid="stAppViewBlockContainer"] {{
-            background-color: rgba(255, 255, 255, 1.0) !important;
+        /* メインコンテンツエリアを真っ白（不透明）にして視認性100%確保（複数セレクタで確実に） */
+        main,
+        [data-testid="stAppViewBlockContainer"],
+        [data-testid="stAppViewContainer"] > section,
+        [data-testid="stAppViewContainer"] .block-container,
+        main .block-container {{
+            background-color: #ffffff !important;
             padding: 3rem !important;
             border-radius: 20px;
             margin-top: 2rem;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+        }}
+        /* カラスに隠れないよう：カラム・ブロック・設定パネルも白背景 */
+        [data-testid="stVerticalBlock"] > div,
+        [data-testid="stHorizontalBlock"] > div,
+        div[data-testid="stVerticalBlock"],
+        section[data-testid="stSidebar"] + section [data-testid="stVerticalBlock"] {{
+            background-color: #ffffff !important;
+        }}
+        /* 設定パネル（板サイズ選定など）を確実に白く（key付きコンテナ） */
+        [data-testid="stVerticalBlock"]:has([data-testid="stRadio"]) {{
+            background-color: #ffffff !important;
+            padding: 0.5rem 1rem !important;
+            border-radius: 8px;
         }}
         /* ラベル文字を太くしてクッキリ見せる */
         [data-testid="stWidgetLabel"] p {{ font-weight: bold !important; color: #000 !important; }}
@@ -102,8 +119,8 @@ with col_in1:
     shelf_df = st.data_editor(st.session_state.shelf_list, num_rows="dynamic", use_container_width=True, key="shelf_editor")
 
 with col_in2:
-    # 【最新機能】border=True のコンテナを使い、設定を物理的な「箱」に閉じ込める
-    with st.container(border=True):
+    # 【最新機能】border=True のコンテナを使い、設定を物理的な「箱」に閉じ込める（keyで白背景をCSS指定）
+    with st.container(border=True, key="settings_panel"):
         st.subheader("⚙️ 設定")
         
         # 3x6寸法入力レイアウト
