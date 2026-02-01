@@ -49,14 +49,29 @@ def set_design_theme(image_file):
             background-color: transparent !important;
             padding: 3rem !important;
         }}
+        /* 半透明にして背景の鳥（itadori.jpg）が透けて見えるように */
+        [data-testid="stDataFrame"],
+        [data-testid="stDataFrame"] > div,
+        [data-testid="stDataFrame"] .ag-root-wrapper,
+        [data-testid="stDataFrame"] .ag-cell,
+        [data-testid="stDataFrame"] .ag-header,
+        [data-testid="stTable"],
+        [data-testid="stTable"] table,
+        [data-testid="stTable"] th,
+        [data-testid="stTable"] td {{
+            background-color: rgba(255, 255, 255, 0.88) !important;
+        }}
+        /* ラジオ・入力欄が確実にクリックできるように */
+        [data-testid="stRadio"] {{ pointer-events: auto !important; }}
+        [data-testid="stRadio"] * {{ pointer-events: auto !important; }}
         /* ラベル文字を太くしてクッキリ見せる */
         [data-testid="stWidgetLabel"] p {{ font-weight: bold !important; color: #000 !important; }}
         </style>
         """
         st.markdown(style, unsafe_allow_html=True)
 
-set_design_theme("itadori.jpg")
 inject_table_white_bg(st)
+set_design_theme("itadori.jpg")
 
 # --- 2. 木取りエンジン (TrunkTechEngine) ---
 class TrunkTechEngine:
@@ -103,7 +118,7 @@ with col_in1:
 
 with col_in2:
     # 【最新機能】border=True のコンテナを使い、設定を物理的な「箱」に閉じ込める（keyで白背景をCSS指定）
-    with st.container(border=True, key="settings_panel"):
+    with st.container(border=True):
         st.subheader("⚙️ 設定")
         
         # 3x6寸法入力レイアウト
@@ -125,7 +140,7 @@ with col_in2:
         c48_5.markdown("<div style='padding-top:10px;'>mm</div>", unsafe_allow_html=True)
         
         st.divider()
-        size_choice = st.radio("板サイズの選定方法", ["自動選定 (効率優先)", "3x6固定", "4x8固定", "手動入力"])
+        size_choice = st.radio("板サイズの選定方法", ["自動選定 (効率優先)", "3x6固定", "4x8固定", "手動入力"], key="size_choice")
         
         if size_choice == "手動入力":
             mc1, mc2 = st.columns(2)
