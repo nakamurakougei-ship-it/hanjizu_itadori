@@ -10,7 +10,6 @@ if 'distutils' not in sys.modules:
     d.version.LooseVersion = LooseVersion; sys.modules['distutils'] = d; sys.modules['distutils.version'] = d.version
 
 import streamlit as st
-import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import pandas as pd
@@ -42,36 +41,13 @@ def set_design_theme(image_file):
             background-position: center;
             background-attachment: fixed;
         }}
-        /* メインエリアは透過のまま → itadori.jpg が表示される */
+        /* メインエリアは透過 → itadori.jpg が背後に表示される（強すぎる白指定はしない） */
         [data-testid="stAppViewBlockContainer"],
         [data-testid="stAppViewContainer"] > section,
         [data-testid="stAppViewContainer"] .block-container,
         main .block-container {{
             background-color: transparent !important;
             padding: 3rem !important;
-        }}
-        /* 黒枠内（設定パネル）だけ白背景：枠要素＋その子孫すべてに適用 */
-        .st-key-settings_panel,
-        .st-key-settings_panel *,
-        .st-key-settings-panel,
-        .st-key-settings-panel *,
-        div[data-testid="stVerticalBlockBorderWrapper"],
-        div[data-testid="stVerticalBlockBorderWrapper"] *,
-        div[style*="border"]:has([data-testid="stRadio"]),
-        div[style*="border"]:has([data-testid="stRadio"]) *,
-        [class*="border"]:has([data-testid="stRadio"]),
-        [class*="border"]:has([data-testid="stRadio"]) *,
-        [class*="stVerticalBlock"]:has([data-testid="stRadio"]),
-        [class*="stVerticalBlock"]:has([data-testid="stRadio"]) * {{
-            background-color: #ffffff !important;
-        }}
-        .st-key-settings_panel,
-        .st-key-settings_panel,
-        div[data-testid="stVerticalBlockBorderWrapper"],
-        div[style*="border"]:has([data-testid="stRadio"]),
-        [class*="border"]:has([data-testid="stRadio"]),
-        [class*="stVerticalBlock"]:has([data-testid="stRadio"]) {{
-            border-radius: 8px;
         }}
         /* ラベル文字を太くしてクッキリ見せる */
         [data-testid="stWidgetLabel"] p {{ font-weight: bold !important; color: #000 !important; }}
@@ -208,40 +184,3 @@ if st.button("🧮 木取り図を作成する", use_container_width=True):
                     ax.add_patch(patches.Rectangle((p['x'],p['y']), p['w'], p['h'], lw=1, ec='black', fc='#deb887', alpha=0.8))
                     ax.text(p['x']+p['w']/2, p['y']+p['h']/2, f"{p['n']}\n{int(p['w'])}x{int(p['h'])}", ha='center', va='center', fontsize=9, fontweight='bold')
             st.pyplot(fig)
-
-# --- 黒枠内だけ白背景にするフォールバック（親ドキュメントの枠付きブロックをJSで白に） ---
-_js_html = """
-<!DOCTYPE html><html><body>
-<script>
-(function(){
-  var doc = window.parent.document;
-  function run() {
-    var radios = doc.querySelectorAll('[data-testid="stRadio"]');
-    radios.forEach(function(radio) {
-      var el = radio;
-      for (var i = 0; i < 20 && el && el !== doc.body; i++) {
-        try {
-          var s = window.parent.getComputedStyle(el);
-          if (s && s.borderWidth && s.borderWidth !== '0px') {
-            el.style.setProperty('background-color', '#ffffff', 'important');
-            el.style.setProperty('border-radius', '8px', 'important');
-            var all = el.querySelectorAll('*');
-            for (var j = 0; j < all.length; j++) {
-              all[j].style.setProperty('background-color', '#ffffff', 'important');
-            }
-            return;
-          }
-        } catch (e) {}
-        el = el.parentElement;
-      }
-    });
-  }
-  if (window.parent.document.readyState === 'loading')
-    window.parent.document.addEventListener('DOMContentLoaded', run);
-  else run();
-  setTimeout(run, 800);
-})();
-</script>
-</body></html>
-"""
-components.html(_js_html, height=0)
