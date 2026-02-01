@@ -94,6 +94,28 @@ def set_design_theme(image_file):
                 display: none !important;
             }}
         }}
+        /* タイトル＋Powered by バッジ（大画面では横並び、狭い画面ではタイトル下に表示） */
+        .title-with-badge .title-main {{
+            font-size: 2.25rem !important;
+            font-weight: 700 !important;
+        }}
+        .title-with-badge .powered-badge {{
+            font-size: 0.65rem !important;
+            font-weight: normal !important;
+            color: #fff !important;
+            background-color: #333 !important;
+            padding: 2px 8px !important;
+            margin-left: 8px !important;
+            border-radius: 4px !important;
+        }}
+        @media (max-width: 768px) {{
+            .title-with-badge .powered-badge {{
+                display: block !important;
+                margin-left: 0 !important;
+                margin-top: 6px !important;
+                width: fit-content !important;
+            }}
+        }}
         </style>
         """
         st.markdown(style, unsafe_allow_html=True)
@@ -128,8 +150,10 @@ class TrunkTechEngine:
 
 # --- 3. UI メインエリア ---
 st.markdown(
-    '# イタドリ '
-    '<span style="font-size: 0.35em; font-weight: normal; color: #bbb; background-color: #444; padding: 2px 8px; margin-left: 8px; border-radius: 4px;">　Powered by TRUNK TECH ENGINE　</span>',
+    '<div class="title-with-badge">'
+    '<span class="title-main">イタドリ</span> '
+    '<span class="powered-badge">Powered by TrunkTechEngine</span>'
+    '</div>',
     unsafe_allow_html=True
 )
 st.write("定尺板から効率よく木取りを行うためのアプリです。")
