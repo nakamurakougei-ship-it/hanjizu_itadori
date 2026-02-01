@@ -1,3 +1,4 @@
+import base64
 import os
 import sys
 import streamlit as st
@@ -14,6 +15,26 @@ from streamlit_common import inject_table_white_bg
 
 # --- 1. アプリ設定 ---
 st.set_page_config(page_title="TRUNK TECH - 棚板木取り", layout="wide")
+
+# ページ背景に itadori.jpg を表示（テーブルは白背景のまま）
+_img_path = os.path.join(_root, "itadori.jpg")
+if os.path.isfile(_img_path):
+    with open(_img_path, "rb") as f:
+        _b64 = base64.b64encode(f.read()).decode()
+    st.markdown(
+        f"""
+        <style>
+        [data-testid="stAppViewContainer"] > section {{
+            background: url("data:image/jpeg;base64,{_b64}") center/cover no-repeat fixed;
+        }}
+        [data-testid="stAppViewContainer"] > section > div,
+        [data-testid="stAppViewContainer"] .block-container {{
+            background: transparent !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 inject_table_white_bg(st)
 
 # --- 2. 木取りエンジン (TrunkTechEngine 改良版) ---
