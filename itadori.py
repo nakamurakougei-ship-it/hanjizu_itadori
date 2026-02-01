@@ -127,7 +127,7 @@ class TrunkTechEngine:
         return sheets
 
 # --- 3. UI メインエリア ---
-st.title("木取りアプリ：イタドリ")
+st.title("イタドリ")
 st.write("定尺板から効率よく木取りを行うためのアプリです。")
 
 st.divider()
@@ -139,8 +139,8 @@ with st.container(key="main_layout_500"):
 with col_main:
     # 1. 設定項目（上）
     with st.container(border=True):
-        st.subheader("⚙️ 設定")
-        
+        st.subheader("定尺板寸法設定")
+        st.write("使用する板の定尺寸法を変更できます")
         st.markdown("**■ 3×6寸法**")
         c36_1, c36_2, c36_3, c36_4, c36_5 = st.columns([1, 4, 2, 4, 1])
         c36_1.markdown("<div style='padding-top:10px;'>縦</div>", unsafe_allow_html=True)
