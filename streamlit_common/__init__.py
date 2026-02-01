@@ -4,6 +4,8 @@
 STREAMLIT_TABLE_WHITE_BG_CSS = """
 <style>
 /* Streamlit テーブル・データエディタに白背景を強制（標準では背景が透けるため） */
+
+/* st.data_editor / st.dataframe 用（AG Grid 系） */
 [data-testid="stDataFrame"],
 [data-testid="stDataFrame"] > div,
 [data-testid="stDataFrame"] .ag-root-wrapper,
@@ -14,10 +16,27 @@ STREAMLIT_TABLE_WHITE_BG_CSS = """
 [data-testid="stDataFrame"] .ag-row,
 [data-testid="stDataFrame"] .ag-row-even,
 [data-testid="stDataFrame"] .ag-row-odd { background-color: #ffffff !important; }
-[data-testid="stTable"] { background-color: #ffffff !important; }
+
+/* st.table 用：コンテナと全子孫を白に（Streamlit の DOM で無視されないよう複数指定） */
+[data-testid="stTable"],
+[data-testid="stTable"] *,
 [data-testid="stTable"] table,
+[data-testid="stTable"] thead,
+[data-testid="stTable"] tbody,
+[data-testid="stTable"] tr,
 [data-testid="stTable"] th,
 [data-testid="stTable"] td { background-color: #ffffff !important; }
+
+/* クラス名でのフォールバック（Streamlit バージョン差に対応） */
+.stTable table,
+.stTable thead,
+.stTable tbody,
+.stTable tr,
+.stTable th,
+.stTable td,
+div[data-testid="stTable"] table,
+div[data-testid="stTable"] th,
+div[data-testid="stTable"] td { background-color: #ffffff !important; }
 </style>
 """
 
