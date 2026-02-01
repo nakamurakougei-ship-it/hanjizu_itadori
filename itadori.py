@@ -21,13 +21,10 @@ st.set_page_config(page_title="TRUNK TECH - イタドリ (木取り特化)", lay
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
 
-# --- 背景画像 & 白背景CSS (Ver. 3.2 視認性重視) ---
+# --- 背景画像 & 視認性100% 白背景CSS ---
 def set_design_theme(image_file):
-    # ファイル名が「イタドリ.jpg」の場合も考慮
-    target_file = image_file if os.path.exists(image_file) else "イタドリ.jpg"
-    
-    if os.path.exists(target_file):
-        with open(target_file, "rb") as f:
+    if os.path.exists(image_file):
+        with open(image_file, "rb") as f:
             img_data = f.read()
         b64_encoded = base64.b64encode(img_data).decode()
         style = f"""
@@ -38,7 +35,7 @@ def set_design_theme(image_file):
             background-position: center;
             background-attachment: fixed;
         }}
-        /* メインコンテンツエリアを真っ白（不透明）にして視認性を確保 */
+        /* メインコンテンツエリアを真っ白（不透明）にして視認性を100%確保 */
         [data-testid="stAppViewBlockContainer"] {{
             background-color: rgba(255, 255, 255, 1.0) !important;
             padding: 3rem !important;
@@ -46,8 +43,8 @@ def set_design_theme(image_file):
             margin-top: 2rem;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
         }}
-        /* ラベル文字を太くして読みやすく */
-        [data-testid="stWidgetLabel"] p {{ font-weight: bold !important; color: #333 !important; }}
+        /* ラベル文字を太くしてクッキリ見せる */
+        [data-testid="stWidgetLabel"] p {{ font-weight: bold !important; color: #000 !important; }}
         </style>
         """
         st.markdown(style, unsafe_allow_html=True)
@@ -92,30 +89,33 @@ with col_in1:
     if 'shelf_list' not in st.session_state:
         st.session_state.shelf_list = pd.DataFrame([
             {"名称": "側板", "巾(W)": 900.0, "奥行(D)": 450.0, "枚数": 4},
-            {"名称": "棚板", "巾(W)": 600.0, "奥行(D)": 300.0, "枚数": 6}
+            {"名称": "棚板", "巾(W)": 600.0, "奥行(D)": 300.0, "枚_数": 6}
         ])
+    # リスト表示（白背景の恩恵を最も受けるエリア）
     shelf_df = st.data_editor(st.session_state.shelf_list, num_rows="dynamic", use_container_width=True, key="shelf_editor")
 
 with col_in2:
-    # 最新機能 st.container(border=True) を使い、設定を一つのカードにまとめる
+    # 【最新機能】border=True のコンテナを使い、設定を物理的な「箱」に閉じ込める
     with st.container(border=True):
         st.subheader("⚙️ 設定")
         
-        # 3x6寸法入力
-        st.write("**3×6寸法**")
-        c36_v, c36_x, c36_h = st.columns([5, 1, 5])
-        v36 = c36_v.number_input("縦(mm)", value=1820.0, key="v36_val")
-        c36_x.markdown("<div style='text-align:center; padding-top:35px;'>×</div>", unsafe_allow_html=True)
-        h36 = c36_h.number_input("横(mm)", value=910.0, key="h36_val")
+        # 3x6寸法入力レイアウト
+        st.markdown("**■ 3×6寸法**")
+        c36_1, c36_2, c36_3, c36_4, c36_5 = st.columns([1, 4, 2, 4, 1])
+        c36_1.markdown("<div style='padding-top:10px;'>縦</div>", unsafe_allow_html=True)
+        v36 = c36_2.number_input("v36", value=1820.0, label_visibility="collapsed")
+        c36_3.markdown("<div style='padding-top:10px;'>mm × 横</div>", unsafe_allow_html=True)
+        h36 = c36_4.number_input("h36", value=910.0, label_visibility="collapsed")
+        c36_5.markdown("<div style='padding-top:10px;'>mm</div>", unsafe_allow_html=True)
         
-        st.write("") # スペース
-        
-        # 4x8寸法入力
-        st.write("**4×8寸法**")
-        c48_v, c48_x, c48_h = st.columns([5, 1, 5])
-        v48 = c48_v.number_input("縦(mm)", value=2440.0, key="v48_val")
-        c48_x.markdown("<div style='text-align:center; padding-top:35px;'>×</div>", unsafe_allow_html=True)
-        h48 = c48_h.number_input("横(mm)", value=1220.0, key="h48_val")
+        # 4x8寸法入力レイアウト
+        st.markdown("**■ 4×8寸法**")
+        c48_1, c48_2, c48_3, c48_4, c48_5 = st.columns([1, 4, 2, 4, 1])
+        c48_1.markdown("<div style='padding-top:10px;'>縦</div>", unsafe_allow_html=True)
+        v48 = c48_2.number_input("v48", value=2440.0, label_visibility="collapsed")
+        c48_3.markdown("<div style='padding-top:10px;'>mm × 横</div>", unsafe_allow_html=True)
+        h48 = c48_4.number_input("h48", value=1220.0, label_visibility="collapsed")
+        c48_5.markdown("<div style='padding-top:10px;'>mm</div>", unsafe_allow_html=True)
         
         st.divider()
         size_choice = st.radio("板サイズの選定方法", ["自動選定 (効率優先)", "3x6固定", "4x8固定", "手動入力"])
@@ -131,8 +131,10 @@ with col_in2:
 if st.button("🧮 木取り図を作成する", use_container_width=True):
     all_parts = []
     for _, row in shelf_df.iterrows():
-        if pd.notna(row.get("名称")) and pd.notna(row.get("枚数")):
-            for i in range(int(row["枚数"])):
+        # 枚数の項目名を柔軟に処理
+        qty = row.get("枚数", row.get("枚_数", 0))
+        if pd.notna(row.get("名称")) and pd.notna(qty):
+            for i in range(int(qty)):
                 all_parts.append({"n": f"{row['名称']}", "w": row["巾(W)"], "d": row["奥行(D)"]})
 
     if not all_parts:
