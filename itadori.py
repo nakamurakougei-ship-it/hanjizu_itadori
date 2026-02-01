@@ -66,6 +66,16 @@ def set_design_theme(image_file):
         [data-testid="stRadio"] * {{ pointer-events: auto !important; }}
         /* ラベル文字を太くしてクッキリ見せる */
         [data-testid="stWidgetLabel"] p {{ font-weight: bold !important; color: #000 !important; }}
+        /* 左カラム幅を 450px で固定（画面比ではなく数値指定） */
+        [class*="main_layout_450"] [data-testid="stHorizontalBlock"] > div:first-child {{
+            width: 450px !important;
+            max-width: 450px !important;
+            min-width: 450px !important;
+            flex: 0 0 450px !important;
+        }}
+        [class*="main_layout_450"] [data-testid="stHorizontalBlock"] > div:last-child {{
+            flex: 1 1 auto !important;
+        }}
         </style>
         """
         st.markdown(style, unsafe_allow_html=True)
@@ -104,8 +114,9 @@ st.write("定尺板から効率よく木取りを行うための専門機です�
 
 st.divider()
 
-# 左寄せ・縦並び：設定 → 板材リスト。テーブル幅は左カラムで固定（右側に背景が見える）
-col_main, col_right = st.columns([3, 1])
+# 左寄せ・縦並び：設定 → 板材リスト。左カラム幅は CSS で 450px 固定（main_layout_450）
+with st.container(key="main_layout_450"):
+    col_main, col_right = st.columns([3, 1])
 
 with col_main:
     # 1. 設定項目（上）
