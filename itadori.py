@@ -127,8 +127,8 @@ class TrunkTechEngine:
         return sheets
 
 # --- 3. UI メインエリア ---
-st.title("🌱 木取り専用アプリ：イタドリ (ITADORI)")
-st.write("定尺板から効率よく木取りを行うための専門機です。")
+st.title("木取りアプリ：イタドリ")
+st.write("定尺板から効率よく木取りを行うためのアプリです。")
 
 st.divider()
 
@@ -170,11 +170,10 @@ with col_main:
     st.divider()
 
     # 2. 板材リストの入力（下）・4項目：名称｜幅｜奥行｜枚数
-    st.subheader("📋 棚板リストの入力")
+    st.subheader("切板リストの入力")
     if 'shelf_list' not in st.session_state:
         st.session_state.shelf_list = pd.DataFrame([
-            {"名称": "側板", "幅": 900.0, "奥行": 450.0, "枚数": 4},
-            {"名称": "棚板", "幅": 600.0, "奥行": 300.0, "枚数": 6}
+            {"名称": "部材名", "幅": 900.0, "奥行": 450.0, "枚数": 4},
         ])
     else:
         # 旧カラム（巾(W), 奥行(D), 枚_数）を新4項目に移行
@@ -189,7 +188,7 @@ with col_main:
     shelf_df = st.data_editor(st.session_state.shelf_list, num_rows="dynamic", use_container_width=True, key="shelf_editor")
 
     # --- 4. 木取り計算実行（ボタンは左カラム内） ---
-    if st.button("🧮 木取り図を作成する", use_container_width=True, key="btn_mokudori"):
+    if st.button("木取り図を作成する", use_container_width=True, key="btn_mokudori"):
         all_parts = []
         for _, row in shelf_df.iterrows():
             qty = row.get("枚数", 0)
