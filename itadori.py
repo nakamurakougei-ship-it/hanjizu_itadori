@@ -129,7 +129,7 @@ class TrunkTechEngine:
 # --- 3. UI メインエリア ---
 st.markdown(
     '# イタドリ '
-    '<span style="font-size: 0.35em; font-weight: normal; color: #fff; background-color: #333; padding: 2px 8px; margin-left: 8px; border-radius: 4px;">powered by TrunkTechEngine</span>',
+    '<span style="font-size: 0.35em; font-weight: normal; color: #fff; background-color: #333; padding: 2px 8px; margin-left: 8px; border-radius: 4px;">  Powered by TrunkTechEngine  </span>',
     unsafe_allow_html=True
 )
 st.write("定尺板から効率よく木取りを行うためのアプリです。")
