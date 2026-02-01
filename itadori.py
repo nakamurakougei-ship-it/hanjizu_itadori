@@ -76,6 +76,24 @@ def set_design_theme(image_file):
         [class*="main_layout_450"] [data-testid="stHorizontalBlock"] > div:last-child {{
             flex: 1 1 auto !important;
         }}
+        /* スマホ表示時のみカラム幅を 100% に（768px 以下をスマホ・タブレットとみなす） */
+        @media (max-width: 768px) {{
+            [class*="main_layout_450"] [data-testid="stHorizontalBlock"] > div:first-child {{
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                flex: 1 1 100% !important;
+            }}
+            [class*="main_layout_450"] [data-testid="stHorizontalBlock"] > div:last-child {{
+                display: none !important;
+            }}
+        }}
+        /* 大画面時のみ：スマホ用の木取図ブロック（下に表示）を非表示 → 右カラムで表示 */
+        @media (min-width: 769px) {{
+            [class*="mokudori_mobile"] {{
+                display: none !important;
+            }}
+        }}
         </style>
         """
         st.markdown(style, unsafe_allow_html=True)
@@ -160,55 +178,81 @@ with col_main:
         ])
     shelf_df = st.data_editor(st.session_state.shelf_list, num_rows="dynamic", use_container_width=True, key="shelf_editor")
 
-# col_right は空欄 → 右側に itadori.jpg の背景が多く見える
+    # --- 4. 木取り計算実行（ボタンは左カラム内） ---
+    if st.button("🧮 木取り図を作成する", use_container_width=True, key="btn_mokudori"):
+        all_parts = []
+        for _, row in shelf_df.iterrows():
+            qty = row.get("枚数", row.get("枚_数", 0))
+            if pd.notna(row.get("名称")) and pd.notna(qty):
+                for i in range(int(qty)):
+                    all_parts.append({"n": f"{row['名称']}", "w": row["巾(W)"], "d": row["奥行(D)"]})
 
-# --- 4. 木取り計算実行 ---
-if st.button("🧮 木取り図を作成する", use_container_width=True):
-    all_parts = []
-    for _, row in shelf_df.iterrows():
-        # 枚数の項目名を柔軟に処理
-        qty = row.get("枚数", row.get("枚_数", 0))
-        if pd.notna(row.get("名称")) and pd.notna(qty):
-            for i in range(int(qty)):
-                all_parts.append({"n": f"{row['名称']}", "w": row["巾(W)"], "d": row["奥行(D)"]})
-
-    if not all_parts:
-        st.warning("棚板リストを入力してください。")
-    else:
-        engine = TrunkTechEngine(kerf=kerf)
-        s36_dim = (v36 - 10, h36 - 10, "3x6")
-        s48_dim = (v48 - 10, h48 - 10, "4x8")
-        
-        sim_results = []
-        if "自動" in size_choice:
-            test_modes = [s36_dim, s48_dim]
-        elif "3x6" in size_choice:
-            test_modes = [s36_dim]
-        elif "4x8" in size_choice:
-            test_modes = [s48_dim]
+        if not all_parts:
+            st.warning("棚板リストを入力してください。")
+            if "diagram_result" in st.session_state:
+                del st.session_state["diagram_result"]
         else:
-            test_modes = [(manual_w - 10, manual_h - 10, "手動")]
+            engine = TrunkTechEngine(kerf=kerf)
+            s36_dim = (v36 - 10, h36 - 10, "3x6")
+            s48_dim = (v48 - 10, h48 - 10, "4x8")
+            sim_results = []
+            if "自動" in size_choice:
+                test_modes = [s36_dim, s48_dim]
+            elif "3x6" in size_choice:
+                test_modes = [s36_dim]
+            elif "4x8" in size_choice:
+                test_modes = [s48_dim]
+            else:
+                test_modes = [(manual_w - 10, manual_h - 10, "手動")]
+            for vw, vh, label in test_modes:
+                sheets = engine.pack_sheets(all_parts, vw, vh)
+                sim_results.append({
+                    "label": label, "sheets": sheets, "sheet_count": len(sheets),
+                    "vw": vw, "vh": vh, "score": len(sheets) * (vw * vh)
+                })
+            best = min(sim_results, key=lambda x: x["score"])
+            st.session_state["diagram_result"] = best
 
-        for vw, vh, label in test_modes:
-            sheets = engine.pack_sheets(all_parts, vw, vh)
-            sim_results.append({
-                "label": label, "sheets": sheets, "sheet_count": len(sheets), 
-                "vw": vw, "vh": vh, "score": len(sheets) * (vw * vh)
-            })
-
-        best = min(sim_results, key=lambda x: x["score"])
-
-        st.divider()
+    if "diagram_result" in st.session_state:
+        best = st.session_state["diagram_result"]
         st.success(f"💡 木取り完了：**{best['label']}板** を **{best['sheet_count']}枚** 使用します。")
 
+# 大画面時：右カラムに木取図を表示（スマホでは従来どおり下に表示される）
+if "diagram_result" in st.session_state:
+    best = st.session_state["diagram_result"]
+    with col_right:
+        st.subheader("🪚 木取図")
         for s in best["sheets"]:
-            fig, ax = plt.subplots(figsize=(12, 6))
+            fig, ax = plt.subplots(figsize=(8, 4))
             v_w_full, v_h_full = best["vw"] + 10, best["vh"] + 10
             ax.set_xlim(0, v_w_full); ax.set_ylim(0, v_h_full); ax.set_aspect('equal')
             ax.add_patch(patches.Rectangle((0,0), v_w_full, v_h_full, fc='#fdf5e6', ec='#8b4513', lw=2))
-            ax.set_title(f"【木取り図】 ID:{s['id']} ({best['label']}：{int(v_w_full)}x{int(v_h_full)})", fontsize=14, fontweight='bold')
+            ax.set_title(f"【木取り図】 ID:{s['id']} ({best['label']}：{int(v_w_full)}x{int(v_h_full)})", fontsize=12, fontweight='bold')
+            for r in s['rows']:
+                for p in r['parts']:
+                    ax.add_patch(patches.Rectangle((p['x'],p['y']), p['w'], p['h'], lw=1, ec='black', fc='#deb887', alpha=0.8))
+                    ax.text(p['x']+p['w']/2, p['y']+p['h']/2, f"{p['n']}\n{int(p['w'])}x{int(p['h'])}", ha='center', va='center', fontsize=8, fontweight='bold')
+            st.pyplot(fig)
+            plt.close(fig)
+else:
+    # 木取図なし時は従来どおり右は空欄（背景が見える）
+    with col_right:
+        pass
+
+# スマホ用：木取図を縦並びの下に表示（大画面では CSS で非表示・右カラムで表示）
+if "diagram_result" in st.session_state:
+    best = st.session_state["diagram_result"]
+    with st.container(key="mokudori_mobile"):
+        st.subheader("🪚 木取り図")
+        for s in best["sheets"]:
+            fig, ax = plt.subplots(figsize=(10, 5))
+            v_w_full, v_h_full = best["vw"] + 10, best["vh"] + 10
+            ax.set_xlim(0, v_w_full); ax.set_ylim(0, v_h_full); ax.set_aspect('equal')
+            ax.add_patch(patches.Rectangle((0,0), v_w_full, v_h_full, fc='#fdf5e6', ec='#8b4513', lw=2))
+            ax.set_title(f"【木取り図】 ID:{s['id']} ({best['label']}：{int(v_w_full)}x{int(v_h_full)})", fontsize=12, fontweight='bold')
             for r in s['rows']:
                 for p in r['parts']:
                     ax.add_patch(patches.Rectangle((p['x'],p['y']), p['w'], p['h'], lw=1, ec='black', fc='#deb887', alpha=0.8))
                     ax.text(p['x']+p['w']/2, p['y']+p['h']/2, f"{p['n']}\n{int(p['w'])}x{int(p['h'])}", ha='center', va='center', fontsize=9, fontweight='bold')
             st.pyplot(fig)
+            plt.close(fig)
