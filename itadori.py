@@ -50,14 +50,27 @@ def set_design_theme(image_file):
             background-color: transparent !important;
             padding: 3rem !important;
         }}
-        /* 黒枠内（設定パネル）だけ白背景：key付きコンテナのクラス名（Streamlit は st-key- を付与） */
+        /* 黒枠内（設定パネル）だけ白背景：枠要素＋その子孫すべてに適用 */
         .st-key-settings_panel,
+        .st-key-settings_panel *,
         .st-key-settings-panel,
+        .st-key-settings-panel *,
+        div[data-testid="stVerticalBlockBorderWrapper"],
+        div[data-testid="stVerticalBlockBorderWrapper"] *,
+        div[style*="border"]:has([data-testid="stRadio"]),
+        div[style*="border"]:has([data-testid="stRadio"]) *,
+        [class*="border"]:has([data-testid="stRadio"]),
+        [class*="border"]:has([data-testid="stRadio"]) *,
+        [class*="stVerticalBlock"]:has([data-testid="stRadio"]),
+        [class*="stVerticalBlock"]:has([data-testid="stRadio"]) * {{
+            background-color: #ffffff !important;
+        }}
+        .st-key-settings_panel,
+        .st-key-settings_panel,
         div[data-testid="stVerticalBlockBorderWrapper"],
         div[style*="border"]:has([data-testid="stRadio"]),
         [class*="border"]:has([data-testid="stRadio"]),
         [class*="stVerticalBlock"]:has([data-testid="stRadio"]) {{
-            background-color: #ffffff !important;
             border-radius: 8px;
         }}
         /* ラベル文字を太くしてクッキリ見せる */
@@ -212,6 +225,10 @@ _js_html = """
           if (s && s.borderWidth && s.borderWidth !== '0px') {
             el.style.setProperty('background-color', '#ffffff', 'important');
             el.style.setProperty('border-radius', '8px', 'important');
+            var all = el.querySelectorAll('*');
+            for (var j = 0; j < all.length; j++) {
+              all[j].style.setProperty('background-color', '#ffffff', 'important');
+            }
             return;
           }
         } catch (e) {}
