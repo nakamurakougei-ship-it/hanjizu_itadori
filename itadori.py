@@ -66,25 +66,25 @@ def set_design_theme(image_file):
         [data-testid="stRadio"] * {{ pointer-events: auto !important; }}
         /* ラベル文字を太くしてクッキリ見せる */
         [data-testid="stWidgetLabel"] p {{ font-weight: bold !important; color: #000 !important; }}
-        /* 左カラム幅を 450px で固定（画面比ではなく数値指定） */
-        [class*="main_layout_450"] [data-testid="stHorizontalBlock"] > div:first-child {{
-            width: 450px !important;
-            max-width: 450px !important;
-            min-width: 450px !important;
-            flex: 0 0 450px !important;
+        /* 左カラム幅を 500px で固定（画面比ではなく数値指定） */
+        [class*="main_layout_500"] [data-testid="stHorizontalBlock"] > div:first-child {{
+            width: 500px !important;
+            max-width: 500px !important;
+            min-width: 500px !important;
+            flex: 0 0 500px !important;
         }}
-        [class*="main_layout_450"] [data-testid="stHorizontalBlock"] > div:last-child {{
+        [class*="main_layout_500"] [data-testid="stHorizontalBlock"] > div:last-child {{
             flex: 1 1 auto !important;
         }}
         /* スマホ表示時のみカラム幅を 100% に（768px 以下をスマホ・タブレットとみなす） */
         @media (max-width: 768px) {{
-            [class*="main_layout_450"] [data-testid="stHorizontalBlock"] > div:first-child {{
+            [class*="main_layout_500"] [data-testid="stHorizontalBlock"] > div:first-child {{
                 width: 100% !important;
                 max-width: 100% !important;
                 min-width: 0 !important;
                 flex: 1 1 100% !important;
             }}
-            [class*="main_layout_450"] [data-testid="stHorizontalBlock"] > div:last-child {{
+            [class*="main_layout_500"] [data-testid="stHorizontalBlock"] > div:last-child {{
                 display: none !important;
             }}
         }}
@@ -132,8 +132,8 @@ st.write("定尺板から効率よく木取りを行うための専門機です�
 
 st.divider()
 
-# 左寄せ・縦並び：設定 → 板材リスト。左カラム幅は CSS で 450px 固定（main_layout_450）
-with st.container(key="main_layout_450"):
+# 左寄せ・縦並び：設定 → 板材リスト。左カラム幅は CSS で 500px 固定（main_layout_500）
+with st.container(key="main_layout_500"):
     col_main, col_right = st.columns([3, 1])
 
 with col_main:
@@ -169,23 +169,37 @@ with col_main:
 
     st.divider()
 
-    # 2. 板材リストの入力（下）・テーブル幅は左カラム内に固定
+    # 2. 板材リストの入力（下）・4項目：名称｜幅｜奥行｜枚数
     st.subheader("📋 棚板リストの入力")
     if 'shelf_list' not in st.session_state:
         st.session_state.shelf_list = pd.DataFrame([
-            {"名称": "側板", "巾(W)": 900.0, "奥行(D)": 450.0, "枚数": 4},
-            {"名称": "棚板", "巾(W)": 600.0, "奥行(D)": 300.0, "枚_数": 6}
+            {"名称": "側板", "幅": 900.0, "奥行": 450.0, "枚数": 4},
+            {"名称": "棚板", "幅": 600.0, "奥行": 300.0, "枚数": 6}
         ])
+    else:
+        # 旧カラム（巾(W), 奥行(D), 枚_数）を新4項目に移行
+        df = st.session_state.shelf_list.copy()
+        if "巾(W)" in df.columns or "奥行(D)" in df.columns or "枚_数" in df.columns:
+            new_df = pd.DataFrame()
+            new_df["名称"] = df["名称"] if "名称" in df.columns else ""
+            new_df["幅"] = df["幅"] if "幅" in df.columns else df["巾(W)"]
+            new_df["奥行"] = df["奥行"] if "奥行" in df.columns else df["奥行(D)"]
+            new_df["枚数"] = df["枚数"] if "枚数" in df.columns else df["枚_数"]
+            st.session_state.shelf_list = new_df
     shelf_df = st.data_editor(st.session_state.shelf_list, num_rows="dynamic", use_container_width=True, key="shelf_editor")
 
     # --- 4. 木取り計算実行（ボタンは左カラム内） ---
     if st.button("🧮 木取り図を作成する", use_container_width=True, key="btn_mokudori"):
         all_parts = []
         for _, row in shelf_df.iterrows():
-            qty = row.get("枚数", row.get("枚_数", 0))
+            qty = row.get("枚数", 0)
             if pd.notna(row.get("名称")) and pd.notna(qty):
-                for i in range(int(qty)):
-                    all_parts.append({"n": f"{row['名称']}", "w": row["巾(W)"], "d": row["奥行(D)"]})
+                try:
+                    n_qty = int(qty)
+                except (TypeError, ValueError):
+                    n_qty = 0
+                for i in range(n_qty):
+                    all_parts.append({"n": f"{row['名称']}", "w": float(row.get("幅", 0)), "d": float(row.get("奥行", 0))})
 
         if not all_parts:
             st.warning("棚板リストを入力してください。")
