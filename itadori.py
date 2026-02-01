@@ -104,24 +104,14 @@ st.write("定尺板から効率よく木取りを行うための専門機です�
 
 st.divider()
 
-col_in1, col_in2 = st.columns([1.8, 1.2])
+# 左寄せ・縦並び：設定 → 板材リスト。テーブル幅は左カラムで固定（右側に背景が見える）
+col_main, col_right = st.columns([3, 1])
 
-with col_in1:
-    st.subheader("📋 棚板リストの入力")
-    if 'shelf_list' not in st.session_state:
-        st.session_state.shelf_list = pd.DataFrame([
-            {"名称": "側板", "巾(W)": 900.0, "奥行(D)": 450.0, "枚数": 4},
-            {"名称": "棚板", "巾(W)": 600.0, "奥行(D)": 300.0, "枚_数": 6}
-        ])
-    # リスト表示（白背景の恩恵を最も受けるエリア）
-    shelf_df = st.data_editor(st.session_state.shelf_list, num_rows="dynamic", use_container_width=True, key="shelf_editor")
-
-with col_in2:
-    # 【最新機能】border=True のコンテナを使い、設定を物理的な「箱」に閉じ込める（keyで白背景をCSS指定）
+with col_main:
+    # 1. 設定項目（上）
     with st.container(border=True):
         st.subheader("⚙️ 設定")
         
-        # 3x6寸法入力レイアウト
         st.markdown("**■ 3×6寸法**")
         c36_1, c36_2, c36_3, c36_4, c36_5 = st.columns([1, 4, 2, 4, 1])
         c36_1.markdown("<div style='padding-top:10px;'>縦</div>", unsafe_allow_html=True)
@@ -130,7 +120,6 @@ with col_in2:
         h36 = c36_4.number_input("h36", value=910.0, label_visibility="collapsed")
         c36_5.markdown("<div style='padding-top:10px;'>mm</div>", unsafe_allow_html=True)
         
-        # 4x8寸法入力レイアウト
         st.markdown("**■ 4×8寸法**")
         c48_1, c48_2, c48_3, c48_4, c48_5 = st.columns([1, 4, 2, 4, 1])
         c48_1.markdown("<div style='padding-top:10px;'>縦</div>", unsafe_allow_html=True)
@@ -148,6 +137,19 @@ with col_in2:
             manual_h = mc2.number_input("板巾(手動)", value=910.0)
         
         kerf = st.number_input("刃物厚 (mm)", value=3.0, step=0.1)
+
+    st.divider()
+
+    # 2. 板材リストの入力（下）・テーブル幅は左カラム内に固定
+    st.subheader("📋 棚板リストの入力")
+    if 'shelf_list' not in st.session_state:
+        st.session_state.shelf_list = pd.DataFrame([
+            {"名称": "側板", "巾(W)": 900.0, "奥行(D)": 450.0, "枚数": 4},
+            {"名称": "棚板", "巾(W)": 600.0, "奥行(D)": 300.0, "枚_数": 6}
+        ])
+    shelf_df = st.data_editor(st.session_state.shelf_list, num_rows="dynamic", use_container_width=True, key="shelf_editor")
+
+# col_right は空欄 → 右側に itadori.jpg の背景が多く見える
 
 # --- 4. 木取り計算実行 ---
 if st.button("🧮 木取り図を作成する", use_container_width=True):
