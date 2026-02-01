@@ -6,8 +6,8 @@ import matplotlib.patches as patches
 import japanize_matplotlib
 import pandas as pd
 
-# 共通モジュール（テーブル白背景）を読み込む
-_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+# 共通モジュール（テーブル白背景）を読み込む（itadori.py と同じフォルダの streamlit_common を参照）
+_root = os.path.dirname(os.path.abspath(__file__))
 if _root not in sys.path:
     sys.path.insert(0, _root)
 from streamlit_common import inject_table_white_bg
