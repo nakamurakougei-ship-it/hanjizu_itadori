@@ -16,6 +16,12 @@ import pandas as pd
 import base64
 import os
 
+# 共通モジュール（テーブル白背景）を読み込む（同フォルダの streamlit_common を参照）
+_root = os.path.dirname(os.path.abspath(__file__))
+if _root not in sys.path:
+    sys.path.insert(0, _root)
+from streamlit_common import inject_table_white_bg
+
 # --- 1. アプリ設定・日本語豆腐文字対策 ---
 st.set_page_config(page_title="TRUNK TECH - イタドリ (木取り特化)", layout="wide")
 plt.rcParams['font.family'] = 'sans-serif'
@@ -50,6 +56,7 @@ def set_design_theme(image_file):
         st.markdown(style, unsafe_allow_html=True)
 
 set_design_theme("itadori.jpg")
+inject_table_white_bg(st)
 
 # --- 2. 木取りエンジン (TrunkTechEngine) ---
 class TrunkTechEngine:
