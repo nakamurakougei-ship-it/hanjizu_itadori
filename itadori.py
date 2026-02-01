@@ -24,8 +24,12 @@ if os.path.isfile(_img_path):
     st.markdown(
         f"""
         <style>
-        [data-testid="stAppViewContainer"] > section {{
-            background: url("data:image/jpeg;base64,{_b64}") center/cover no-repeat fixed;
+        .stApp {{
+            background-image: url("data:image/jpeg;base64,{_b64}") !important;
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+            background-attachment: fixed !important;
         }}
         [data-testid="stAppViewContainer"] > section > div,
         [data-testid="stAppViewContainer"] .block-container {{
