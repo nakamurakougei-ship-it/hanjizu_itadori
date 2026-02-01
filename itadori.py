@@ -21,10 +21,13 @@ st.set_page_config(page_title="TRUNK TECH - イタドリ (木取り特化)", lay
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
 
-# --- 背景画像 & 視認性向上CSS (Ver. 3.1 決定版) ---
+# --- 背景画像 & 白背景CSS (Ver. 3.2 視認性重視) ---
 def set_design_theme(image_file):
-    if os.path.exists(image_file):
-        with open(image_file, "rb") as f:
+    # ファイル名が「イタドリ.jpg」の場合も考慮
+    target_file = image_file if os.path.exists(image_file) else "イタドリ.jpg"
+    
+    if os.path.exists(target_file):
+        with open(target_file, "rb") as f:
             img_data = f.read()
         b64_encoded = base64.b64encode(img_data).decode()
         style = f"""
@@ -35,24 +38,15 @@ def set_design_theme(image_file):
             background-position: center;
             background-attachment: fixed;
         }}
-        /* メインコンテンツエリア */
+        /* メインコンテンツエリアを真っ白（不透明）にして視認性を確保 */
         [data-testid="stAppViewBlockContainer"] {{
-            background-color: rgba(255, 255, 255, 0.7) !important;
-            backdrop-filter: blur(10px) !important;
-            -webkit-backdrop-filter: blur(10px) !important;
+            background-color: rgba(255, 255, 255, 1.0) !important;
             padding: 3rem !important;
             border-radius: 20px;
             margin-top: 2rem;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
         }}
-        /* 【修正】設定エリア（右カラム）全体をカードにするCSS */
-        [data-testid="column"]:nth-of-type(2) [data-testid="stVerticalBlock"] > div {{
-            background-color: rgba(255, 255, 255, 0.8) !important;
-            padding: 15px;
-            border-radius: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }}
-        /* 各入力ラベルの調整 */
+        /* ラベル文字を太くして読みやすく */
         [data-testid="stWidgetLabel"] p {{ font-weight: bold !important; color: #333 !important; }}
         </style>
         """
@@ -103,27 +97,25 @@ with col_in1:
     shelf_df = st.data_editor(st.session_state.shelf_list, num_rows="dynamic", use_container_width=True, key="shelf_editor")
 
 with col_in2:
-    # 容器（カード）を開始
-    with st.container():
+    # 最新機能 st.container(border=True) を使い、設定を一つのカードにまとめる
+    with st.container(border=True):
         st.subheader("⚙️ 設定")
         
         # 3x6寸法入力
         st.write("**3×6寸法**")
-        c36_1, c36_2, c36_3, c36_4, c36_5 = st.columns([1, 4, 2, 4, 1])
-        c36_1.markdown("<div style='padding-top:10px;'>縦</div>", unsafe_allow_html=True)
-        v36 = c36_2.number_input("36V", value=1820.0, label_visibility="collapsed")
-        c36_3.markdown("<div style='padding-top:10px;'>mm × 横</div>", unsafe_allow_html=True)
-        h36 = c36_4.number_input("36H", value=910.0, label_visibility="collapsed")
-        c36_5.markdown("<div style='padding-top:10px;'>mm</div>", unsafe_allow_html=True)
+        c36_v, c36_x, c36_h = st.columns([5, 1, 5])
+        v36 = c36_v.number_input("縦(mm)", value=1820.0, key="v36_val")
+        c36_x.markdown("<div style='text-align:center; padding-top:35px;'>×</div>", unsafe_allow_html=True)
+        h36 = c36_h.number_input("横(mm)", value=910.0, key="h36_val")
+        
+        st.write("") # スペース
         
         # 4x8寸法入力
         st.write("**4×8寸法**")
-        c48_1, c48_2, c48_3, c48_4, c48_5 = st.columns([1, 4, 2, 4, 1])
-        c48_1.markdown("<div style='padding-top:10px;'>縦</div>", unsafe_allow_html=True)
-        v48 = c48_2.number_input("48V", value=2440.0, label_visibility="collapsed")
-        c48_3.markdown("<div style='padding-top:10px;'>mm × 横</div>", unsafe_allow_html=True)
-        h48 = c48_4.number_input("48H", value=1220.0, label_visibility="collapsed")
-        c48_5.markdown("<div style='padding-top:10px;'>mm</div>", unsafe_allow_html=True)
+        c48_v, c48_x, c48_h = st.columns([5, 1, 5])
+        v48 = c48_v.number_input("縦(mm)", value=2440.0, key="v48_val")
+        c48_x.markdown("<div style='text-align:center; padding-top:35px;'>×</div>", unsafe_allow_html=True)
+        h48 = c48_h.number_input("横(mm)", value=1220.0, key="h48_val")
         
         st.divider()
         size_choice = st.radio("板サイズの選定方法", ["自動選定 (効率優先)", "3x6固定", "4x8固定", "手動入力"])
