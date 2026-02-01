@@ -41,29 +41,19 @@ def set_design_theme(image_file):
             background-position: center;
             background-attachment: fixed;
         }}
-        /* メインコンテンツエリアを真っ白（不透明）にして視認性100%確保（複数セレクタで確実に） */
-        main,
+        /* メインエリアは透過のまま → itadori.jpg が表示される */
         [data-testid="stAppViewBlockContainer"],
         [data-testid="stAppViewContainer"] > section,
         [data-testid="stAppViewContainer"] .block-container,
         main .block-container {{
-            background-color: #ffffff !important;
+            background-color: transparent !important;
             padding: 3rem !important;
-            border-radius: 20px;
-            margin-top: 2rem;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
         }}
-        /* カラスに隠れないよう：カラム・ブロック・設定パネルも白背景 */
-        [data-testid="stVerticalBlock"] > div,
-        [data-testid="stHorizontalBlock"] > div,
-        div[data-testid="stVerticalBlock"],
-        section[data-testid="stSidebar"] + section [data-testid="stVerticalBlock"] {{
+        /* 黒枠内（設定パネル）だけ白背景：border=True のコンテナを指定 */
+        div[data-testid="stVerticalBlockBorderWrapper"],
+        div[style*="border"]:has([data-testid="stRadio"]),
+        [class*="border"]:has([data-testid="stRadio"]) {{
             background-color: #ffffff !important;
-        }}
-        /* 設定パネル（板サイズ選定など）を確実に白く（key付きコンテナ） */
-        [data-testid="stVerticalBlock"]:has([data-testid="stRadio"]) {{
-            background-color: #ffffff !important;
-            padding: 0.5rem 1rem !important;
             border-radius: 8px;
         }}
         /* ラベル文字を太くしてクッキリ見せる */
