@@ -127,9 +127,11 @@ class TrunkTechEngine:
         return sheets
 
 # --- 3. UI メインエリア ---
-st.title("イタドリ　")
-<span style="font-size: 14px; font-weight: normal; color: #5d6d7e; margin-left: 10px;">powered by TRUNK</span>',
+st.markdown(
+    '# イタドリ '
+    '<span style="font-size: 0.45em; font-weight: normal; color: #5d6d7e; margin-left: 8px;">powered by TrunkTechEngine</span>',
     unsafe_allow_html=True
+)
 st.write("定尺板から効率よく木取りを行うためのアプリです。")
 
 # 左寄せ・縦並び：設定 → 板材リスト。左カラム幅は CSS で 500px 固定（main_layout_500）
