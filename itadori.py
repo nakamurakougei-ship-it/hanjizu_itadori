@@ -28,7 +28,8 @@ from streamlit_common import inject_table_white_bg
 # --- 1. アプリ設定・日本語豆腐文字対策 ---
 st.set_page_config(page_title="TRUNK TECH - イタドリ (木取り特化)", layout="wide")
 plt.rcParams['font.family'] = 'sans-serif'
-plt.rcParams['font.sans-serif'] = ['IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
+# Windowsで日本語（木取図ラベル・部材名）が文字化けしないようCJKフォントを優先
+plt.rcParams['font.sans-serif'] = ['MS Gothic', 'Yu Gothic UI', 'Meiryo', 'IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
 
 # --- 背景画像 & 視認性100% 白背景CSS ---
 def set_design_theme(image_file):
@@ -180,15 +181,17 @@ def render_sheet_to_png_bytes(sheet, v_w_full, v_h_full, label):
     return base64.b64encode(buf.read()).decode("utf-8")
 
 
-def build_print_html(best, max_per_page=3):
-    """木取図をA4に3枚/ページで印刷できるHTMLを生成"""
+def build_print_html(best, max_per_page=None):
+    """木取図を印刷用HTMLに出力。max_per_page指定時はその枚数でページ分割、未指定時は1枚ずつ1ページ"""
     v_w_full = best["vw"] + 2
     v_h_full = best["vh"] + 2
     label = best["label"]
     images_b64 = []
     for s in best["sheets"]:
         images_b64.append(render_sheet_to_png_bytes(s, v_w_full, v_h_full, label))
-    pages = [images_b64[i : i + max_per_page] for i in range(0, len(images_b64), max_per_page)]
+    # 固定せず：未指定なら1枚1ページ、指定があればその枚数でまとめる（目安として可変）
+    chunk = max_per_page if max_per_page is not None and max_per_page >= 1 else 1
+    pages = [images_b64[i : i + chunk] for i in range(0, len(images_b64), chunk)]
     html_parts = []
     html_parts.append("""<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
@@ -329,9 +332,9 @@ with col_main:
         best = st.session_state["diagram_result"]
         st.success(f"💡 木取り完了：**{best['label']}板** を **{best['sheet_count']}枚** 使用します。")
         # A4に3枚/ページの印刷用HTMLダウンロード
-        print_html = build_print_html(best, max_per_page=3)
+        print_html = build_print_html(best)
         st.download_button(
-            "🖨️ 木取図を印刷用にダウンロード（A4・3枚/ページ）",
+            "🖨️ 木取図を印刷用にダウンロード（A4）",
             data=print_html,
             file_name="mokudori_print.html",
             mime="text/html",
