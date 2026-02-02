@@ -49,6 +49,15 @@ def set_design_theme(image_file):
             background-color: transparent !important;
             padding: 3rem !important;
         }}
+        /* 棚板リスト：スクロールバーなしで全行表示（高さを自動に） */
+        [data-testid="stDataFrame"] .ag-body-viewport,
+        [data-testid="stDataFrame"] .ag-center-cols-viewport {{
+            overflow: visible !important;
+            max-height: none !important;
+        }}
+        [data-testid="stDataFrame"] .ag-root-wrapper {{
+            height: auto !important;
+        }}
         /* 半透明にして背景の鳥（itadori.jpg）が透けて見えるように */
         [data-testid="stDataFrame"],
         [data-testid="stDataFrame"] > div,
@@ -211,7 +220,7 @@ with col_main:
             new_df["奥行"] = df["奥行"] if "奥行" in df.columns else df["奥行(D)"]
             new_df["枚数"] = df["枚数"] if "枚数" in df.columns else df["枚_数"]
             st.session_state.shelf_list = new_df
-    shelf_df = st.data_editor(st.session_state.shelf_list, num_rows="dynamic", use_container_width=True, key="shelf_editor")
+    shelf_df = st.data_editor(st.session_state.shelf_list, num_rows="dynamic", use_container_width=True, height="content", key="shelf_editor")
 
     # --- 4. 木取り計算実行（ボタンは左カラム内） ---
     if st.button("木取り図を作成する", use_container_width=True, key="btn_mokudori"):
@@ -232,8 +241,9 @@ with col_main:
                 del st.session_state["diagram_result"]
         else:
             engine = TrunkTechEngine(kerf=kerf)
-            s36_dim = (v36 - 10, h36 - 10, "3x6")
-            s48_dim = (v48 - 10, h48 - 10, "4x8")
+            # 板寸法は鼻切り分のみ控え（-2mm）にしてネスティング余裕を確保（-10だと3×6で幅方向に積めない）
+            s36_dim = (v36 - 2, h36 - 2, "3x6")
+            s48_dim = (v48 - 2, h48 - 2, "4x8")
             sim_results = []
             if "自動" in size_choice:
                 test_modes = [s36_dim, s48_dim]
@@ -242,14 +252,16 @@ with col_main:
             elif "4x8" in size_choice:
                 test_modes = [s48_dim]
             else:
-                test_modes = [(manual_w - 10, manual_h - 10, "手動")]
+                test_modes = [(manual_w - 2, manual_h - 2, "手動")]
             for vw, vh, label in test_modes:
                 sheets = engine.pack_sheets(all_parts, vw, vh)
+                total_area = len(sheets) * (vw * vh)
                 sim_results.append({
                     "label": label, "sheets": sheets, "sheet_count": len(sheets),
-                    "vw": vw, "vh": vh, "score": len(sheets) * (vw * vh)
+                    "vw": vw, "vh": vh, "score": total_area
                 })
-            best = min(sim_results, key=lambda x: x["score"])
+            # 枚数優先、同枚数なら面積が小さい板を選択（3×6を優先）
+            best = min(sim_results, key=lambda x: (x["sheet_count"], x["score"]))
             st.session_state["diagram_result"] = best
 
     if "diagram_result" in st.session_state:
@@ -263,7 +275,7 @@ if "diagram_result" in st.session_state:
         st.subheader("🪚 木取図")
         for s in best["sheets"]:
             fig, ax = plt.subplots(figsize=(8, 4))
-            v_w_full, v_h_full = best["vw"] + 10, best["vh"] + 10
+            v_w_full, v_h_full = best["vw"] + 2, best["vh"] + 2
             ax.set_xlim(0, v_w_full); ax.set_ylim(0, v_h_full); ax.set_aspect('equal')
             ax.add_patch(patches.Rectangle((0,0), v_w_full, v_h_full, fc='#fdf5e6', ec='#8b4513', lw=2))
             ax.set_title(f"【木取り図】 ID:{s['id']} ({best['label']}：{int(v_w_full)}x{int(v_h_full)})", fontsize=12, fontweight='bold')
@@ -285,7 +297,7 @@ if "diagram_result" in st.session_state:
         st.subheader("🪚 木取り図")
         for s in best["sheets"]:
             fig, ax = plt.subplots(figsize=(10, 5))
-            v_w_full, v_h_full = best["vw"] + 10, best["vh"] + 10
+            v_w_full, v_h_full = best["vw"] + 2, best["vh"] + 2
             ax.set_xlim(0, v_w_full); ax.set_ylim(0, v_h_full); ax.set_aspect('equal')
             ax.add_patch(patches.Rectangle((0,0), v_w_full, v_h_full, fc='#fdf5e6', ec='#8b4513', lw=2))
             ax.set_title(f"【木取り図】 ID:{s['id']} ({best['label']}：{int(v_w_full)}x{int(v_h_full)})", fontsize=12, fontweight='bold')
