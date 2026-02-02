@@ -10,11 +10,14 @@ if 'distutils' not in sys.modules:
     d.version.LooseVersion = LooseVersion; sys.modules['distutils'] = d; sys.modules['distutils.version'] = d.version
 
 import streamlit as st
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import pandas as pd
 import base64
 import os
+import io
 
 # 共通モジュール（テーブル白背景）を読み込む（同フォルダの streamlit_common を参照）
 _root = os.path.dirname(os.path.abspath(__file__))
@@ -157,6 +160,53 @@ class TrunkTechEngine:
                                          'parts': [{'n': p['n'], 'x': 0, 'y': 0, 'w': p['w'], 'h': p['d']}]}]})
         return sheets
 
+
+def render_sheet_to_png_bytes(sheet, v_w_full, v_h_full, label):
+    """1枚の木取図をPNGバイト列で返す（印刷用）"""
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.set_xlim(0, v_w_full)
+    ax.set_ylim(0, v_h_full)
+    ax.set_aspect("equal")
+    ax.add_patch(patches.Rectangle((0, 0), v_w_full, v_h_full, fc="#fdf5e6", ec="#8b4513", lw=2))
+    ax.set_title(f"【木取り図】 ID:{sheet['id']} ({label}：{int(v_w_full)}x{int(v_h_full)})", fontsize=10, fontweight="bold")
+    for r in sheet["rows"]:
+        for p in r["parts"]:
+            ax.add_patch(patches.Rectangle((p["x"], p["y"]), p["w"], p["h"], lw=1, ec="black", fc="#deb887", alpha=0.8))
+            ax.text(p["x"] + p["w"] / 2, p["y"] + p["h"] / 2, f"{p['n']}\n{int(p['w'])}x{int(p['h'])}", ha="center", va="center", fontsize=6, fontweight="bold")
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode("utf-8")
+
+
+def build_print_html(best, max_per_page=3):
+    """木取図をA4に3枚/ページで印刷できるHTMLを生成"""
+    v_w_full = best["vw"] + 2
+    v_h_full = best["vh"] + 2
+    label = best["label"]
+    images_b64 = []
+    for s in best["sheets"]:
+        images_b64.append(render_sheet_to_png_bytes(s, v_w_full, v_h_full, label))
+    pages = [images_b64[i : i + max_per_page] for i in range(0, len(images_b64), max_per_page)]
+    html_parts = []
+    html_parts.append("""<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+@media print { @page { size: A4; margin: 10mm; } body { margin: 0; } }
+.diagram-page { page-break-after: always; padding: 0; }
+.diagram-page:last-child { page-break-after: auto; }
+.diagram-img { width: 100%; max-height: 32%; object-fit: contain; margin-bottom: 2mm; }
+h1 { font-size: 14pt; margin-bottom: 4mm; }
+</style></head><body>""")
+    for i, page_imgs in enumerate(pages):
+        html_parts.append(f'<div class="diagram-page"><h1>木取図（{label}）— {i+1}ページ目</h1>')
+        for j, b64 in enumerate(page_imgs):
+            html_parts.append(f'<img class="diagram-img" src="data:image/png;base64,{b64}" alt="木取図{j+1}"/>')
+        html_parts.append("</div>")
+    html_parts.append("</body></html>")
+    return "".join(html_parts)
+
+
 # --- 3. UI メインエリア ---
 st.markdown(
     '<div class="title-with-badge">'
@@ -179,26 +229,34 @@ with col_main:
         st.markdown("**■ 3×6寸法**")
         c36_1, c36_2, c36_3, c36_4, c36_5 = st.columns([1, 4, 2, 4, 1])
         c36_1.markdown("<div style='padding-top:10px;'>縦</div>", unsafe_allow_html=True)
-        v36 = c36_2.number_input("v36", value=1820.0, label_visibility="collapsed")
+        v36 = c36_2.number_input("v36", value=1820, min_value=1, step=1, label_visibility="collapsed")
         c36_3.markdown("<div style='padding-top:10px;'>mm × 横</div>", unsafe_allow_html=True)
-        h36 = c36_4.number_input("h36", value=910.0, label_visibility="collapsed")
+        h36 = c36_4.number_input("h36", value=910, min_value=1, step=1, label_visibility="collapsed")
         c36_5.markdown("<div style='padding-top:10px;'>mm</div>", unsafe_allow_html=True)
         
         st.markdown("**■ 4×8寸法**")
         c48_1, c48_2, c48_3, c48_4, c48_5 = st.columns([1, 4, 2, 4, 1])
         c48_1.markdown("<div style='padding-top:10px;'>縦</div>", unsafe_allow_html=True)
-        v48 = c48_2.number_input("v48", value=2440.0, label_visibility="collapsed")
+        v48 = c48_2.number_input("v48", value=2440, min_value=1, step=1, label_visibility="collapsed")
         c48_3.markdown("<div style='padding-top:10px;'>mm × 横</div>", unsafe_allow_html=True)
-        h48 = c48_4.number_input("h48", value=1220.0, label_visibility="collapsed")
+        h48 = c48_4.number_input("h48", value=1220, min_value=1, step=1, label_visibility="collapsed")
         c48_5.markdown("<div style='padding-top:10px;'>mm</div>", unsafe_allow_html=True)
         
-        st.divider()
-        size_choice = st.radio("板サイズの選定方法", ["自動選定 (効率優先)", "3x6固定", "4x8固定", "手動入力"], key="size_choice")
+        st.markdown("**■ 集成材**")
+        lam_w = st.number_input("集成材 幅 (mm)", value=500, min_value=500, max_value=600, step=1, key="lam_w")
+        lam_l = st.number_input("集成材 長さ (mm)", value=3600, min_value=3000, max_value=4200, step=1, key="lam_l")
         
-        if size_choice == "手動入力":
+        st.divider()
+        size_choice = st.radio("板サイズの選定方法", ["自動選定 (効率優先)", "3x6固定", "4x8固定", "集成材", "手動入力"], key="size_choice")
+        
+        if size_choice == "集成材":
+            # 集成材は幅×長さ（縦＝長さ、横＝幅で木取り）
+            manual_w = float(lam_l)
+            manual_h = float(lam_w)
+        elif size_choice == "手動入力":
             mc1, mc2 = st.columns(2)
-            manual_w = mc1.number_input("板長さ(手動)", value=1820.0)
-            manual_h = mc2.number_input("板巾(手動)", value=910.0)
+            manual_w = mc1.number_input("板長さ(手動)", value=1820, min_value=1, step=1)
+            manual_h = mc2.number_input("板巾(手動)", value=910, min_value=1, step=1)
         
         kerf = st.number_input("刃物厚 (mm)", value=3.0, step=0.1)
 
@@ -244,13 +302,16 @@ with col_main:
             # 板寸法は鼻切り分のみ控え（-2mm）にしてネスティング余裕を確保（-10だと3×6で幅方向に積めない）
             s36_dim = (v36 - 2, h36 - 2, "3x6")
             s48_dim = (v48 - 2, h48 - 2, "4x8")
+            s_lam_dim = (float(lam_l) - 2, float(lam_w) - 2, "集成材")
             sim_results = []
             if "自動" in size_choice:
-                test_modes = [s36_dim, s48_dim]
+                test_modes = [s36_dim, s48_dim, s_lam_dim]
             elif "3x6" in size_choice:
                 test_modes = [s36_dim]
             elif "4x8" in size_choice:
                 test_modes = [s48_dim]
+            elif "集成材" in size_choice:
+                test_modes = [s_lam_dim]
             else:
                 test_modes = [(manual_w - 2, manual_h - 2, "手動")]
             for vw, vh, label in test_modes:
@@ -267,6 +328,16 @@ with col_main:
     if "diagram_result" in st.session_state:
         best = st.session_state["diagram_result"]
         st.success(f"💡 木取り完了：**{best['label']}板** を **{best['sheet_count']}枚** 使用します。")
+        # A4に3枚/ページの印刷用HTMLダウンロード
+        print_html = build_print_html(best, max_per_page=3)
+        st.download_button(
+            "🖨️ 木取図を印刷用にダウンロード（A4・3枚/ページ）",
+            data=print_html,
+            file_name="mokudori_print.html",
+            mime="text/html",
+            use_container_width=True,
+            key="btn_print_dl"
+        )
 
 # 大画面時：右カラムに木取図を表示（スマホでは従来どおり下に表示される）
 if "diagram_result" in st.session_state:
