@@ -14,6 +14,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.font_manager as fm
 import pandas as pd
 import base64
 import os
@@ -28,8 +29,33 @@ from streamlit_common import inject_table_white_bg
 # --- 1. アプリ設定・日本語豆腐文字対策 ---
 st.set_page_config(page_title="TRUNK TECH - イタドリ (木取り特化)", layout="wide")
 plt.rcParams['font.family'] = 'sans-serif'
-# Windowsで日本語（木取図ラベル・部材名）が文字化けしないようCJKフォントを優先
-plt.rcParams['font.sans-serif'] = ['MS Gothic', 'Yu Gothic UI', 'Meiryo', 'IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
+plt.rcParams['font.sans-serif'] = ['IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
+
+def _get_japanese_font():
+    """日本語を表示するフォントをパスで指定して取得（名前指定では環境で見つからないため）"""
+    if getattr(_get_japanese_font, "_cached", None) is not None:
+        return _get_japanese_font._cached
+    # Windows の標準フォントパスを優先（ドライブは os.environ や os.path で取得）
+    windir = os.environ.get("WINDIR", "C:\\Windows")
+    candidates = [
+        os.path.join(windir, "Fonts", "msgothic.ttc"),
+        os.path.join(windir, "Fonts", "msmincho.ttc"),
+        os.path.join(windir, "Fonts", "yugothm.ttc"),
+        os.path.join(windir, "Fonts", "meiryo.ttc"),
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            try:
+                prop = fm.FontProperties(fname=path)
+                _get_japanese_font._cached = prop
+                return prop
+            except Exception:
+                continue
+    _get_japanese_font._cached = None
+    return None
+
+# 木取図のタイトル・部材名に使う日本語フォント（パス指定で確実に表示）
+_jp_font = _get_japanese_font()
 
 # --- 背景画像 & 視認性100% 白背景CSS ---
 def set_design_theme(image_file):
@@ -169,11 +195,17 @@ def render_sheet_to_png_bytes(sheet, v_w_full, v_h_full, label):
     ax.set_ylim(0, v_h_full)
     ax.set_aspect("equal")
     ax.add_patch(patches.Rectangle((0, 0), v_w_full, v_h_full, fc="#fdf5e6", ec="#8b4513", lw=2))
-    ax.set_title(f"【木取り図】 ID:{sheet['id']} ({label}：{int(v_w_full)}x{int(v_h_full)})", fontsize=10, fontweight="bold")
+    kw_title = {"fontsize": 10, "fontweight": "bold"}
+    if _jp_font is not None:
+        kw_title["fontproperties"] = _jp_font
+    ax.set_title(f"【木取り図】 ID:{sheet['id']} ({label}：{int(v_w_full)}x{int(v_h_full)})", **kw_title)
+    kw_text = {"ha": "center", "va": "center", "fontsize": 6, "fontweight": "bold"}
+    if _jp_font is not None:
+        kw_text["fontproperties"] = _jp_font
     for r in sheet["rows"]:
         for p in r["parts"]:
             ax.add_patch(patches.Rectangle((p["x"], p["y"]), p["w"], p["h"], lw=1, ec="black", fc="#deb887", alpha=0.8))
-            ax.text(p["x"] + p["w"] / 2, p["y"] + p["h"] / 2, f"{p['n']}\n{int(p['w'])}x{int(p['h'])}", ha="center", va="center", fontsize=6, fontweight="bold")
+            ax.text(p["x"] + p["w"] / 2, p["y"] + p["h"] / 2, f"{p['n']}\n{int(p['w'])}x{int(p['h'])}", **kw_text)
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -352,11 +384,17 @@ if "diagram_result" in st.session_state:
             v_w_full, v_h_full = best["vw"] + 2, best["vh"] + 2
             ax.set_xlim(0, v_w_full); ax.set_ylim(0, v_h_full); ax.set_aspect('equal')
             ax.add_patch(patches.Rectangle((0,0), v_w_full, v_h_full, fc='#fdf5e6', ec='#8b4513', lw=2))
-            ax.set_title(f"【木取り図】 ID:{s['id']} ({best['label']}：{int(v_w_full)}x{int(v_h_full)})", fontsize=12, fontweight='bold')
+            kw_t = {"fontsize": 12, "fontweight": "bold"}
+            if _jp_font is not None:
+                kw_t["fontproperties"] = _jp_font
+            ax.set_title(f"【木取り図】 ID:{s['id']} ({best['label']}：{int(v_w_full)}x{int(v_h_full)})", **kw_t)
+            kw_txt = {"ha": "center", "va": "center", "fontsize": 8, "fontweight": "bold"}
+            if _jp_font is not None:
+                kw_txt["fontproperties"] = _jp_font
             for r in s['rows']:
                 for p in r['parts']:
                     ax.add_patch(patches.Rectangle((p['x'],p['y']), p['w'], p['h'], lw=1, ec='black', fc='#deb887', alpha=0.8))
-                    ax.text(p['x']+p['w']/2, p['y']+p['h']/2, f"{p['n']}\n{int(p['w'])}x{int(p['h'])}", ha='center', va='center', fontsize=8, fontweight='bold')
+                    ax.text(p['x']+p['w']/2, p['y']+p['h']/2, f"{p['n']}\n{int(p['w'])}x{int(p['h'])}", **kw_txt)
             st.pyplot(fig)
             plt.close(fig)
 else:
@@ -374,10 +412,16 @@ if "diagram_result" in st.session_state:
             v_w_full, v_h_full = best["vw"] + 2, best["vh"] + 2
             ax.set_xlim(0, v_w_full); ax.set_ylim(0, v_h_full); ax.set_aspect('equal')
             ax.add_patch(patches.Rectangle((0,0), v_w_full, v_h_full, fc='#fdf5e6', ec='#8b4513', lw=2))
-            ax.set_title(f"【木取り図】 ID:{s['id']} ({best['label']}：{int(v_w_full)}x{int(v_h_full)})", fontsize=12, fontweight='bold')
+            kw_t2 = {"fontsize": 12, "fontweight": "bold"}
+            if _jp_font is not None:
+                kw_t2["fontproperties"] = _jp_font
+            ax.set_title(f"【木取り図】 ID:{s['id']} ({best['label']}：{int(v_w_full)}x{int(v_h_full)})", **kw_t2)
+            kw_txt2 = {"ha": "center", "va": "center", "fontsize": 9, "fontweight": "bold"}
+            if _jp_font is not None:
+                kw_txt2["fontproperties"] = _jp_font
             for r in s['rows']:
                 for p in r['parts']:
                     ax.add_patch(patches.Rectangle((p['x'],p['y']), p['w'], p['h'], lw=1, ec='black', fc='#deb887', alpha=0.8))
-                    ax.text(p['x']+p['w']/2, p['y']+p['h']/2, f"{p['n']}\n{int(p['w'])}x{int(p['h'])}", ha='center', va='center', fontsize=9, fontweight='bold')
+                    ax.text(p['x']+p['w']/2, p['y']+p['h']/2, f"{p['n']}\n{int(p['w'])}x{int(p['h'])}", **kw_txt2)
             st.pyplot(fig)
             plt.close(fig)
