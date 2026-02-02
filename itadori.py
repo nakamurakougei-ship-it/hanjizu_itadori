@@ -31,31 +31,33 @@ st.set_page_config(page_title="TRUNK TECH - イタドリ (木取り特化)", lay
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
 
-def _get_japanese_font():
-    """日本語を表示するフォントをパスで指定して取得（名前指定では環境で見つからないため）"""
-    if getattr(_get_japanese_font, "_cached", None) is not None:
-        return _get_japanese_font._cached
-    # Windows の標準フォントパスを優先（ドライブは os.environ や os.path で取得）
-    windir = os.environ.get("WINDIR", "C:\\Windows")
-    candidates = [
-        os.path.join(windir, "Fonts", "msgothic.ttc"),
-        os.path.join(windir, "Fonts", "msmincho.ttc"),
-        os.path.join(windir, "Fonts", "yugothm.ttc"),
-        os.path.join(windir, "Fonts", "meiryo.ttc"),
-    ]
-    for path in candidates:
-        if os.path.isfile(path):
-            try:
-                prop = fm.FontProperties(fname=path)
-                _get_japanese_font._cached = prop
-                return prop
-            except Exception:
-                continue
-    _get_japanese_font._cached = None
+def _setup_japanese_font():
+    """Windows の MS ゴシック等をパスで登録し、Matplotlib で日本語が描画されるようにする。
+    木取図は PNG 画像なので、図中の文字は Matplotlib のフォントで描画される。
+    戻り値: 使う FontProperties（パス指定）。登録に失敗したら None。"""
+    windir = os.environ.get("SystemRoot", os.environ.get("WINDIR", "C:\\Windows"))
+    fonts_dir = os.path.join(windir, "Fonts")
+    candidates = ["msgothic.ttc", "msmincho.ttc", "meiryo.ttc", "yugothm.ttc"]
+    for fname in candidates:
+        path = os.path.join(fonts_dir, fname)
+        if not os.path.isfile(path):
+            continue
+        try:
+            if hasattr(fm.fontManager, "addfont"):
+                fm.fontManager.addfont(path)
+            prop = fm.FontProperties(fname=path)
+            name = prop.get_name()
+            plt.rcParams["font.sans-serif"] = [name] + [
+                x for x in plt.rcParams["font.sans-serif"] if x != name
+            ]
+            plt.rcParams["font.family"] = "sans-serif"
+            return prop
+        except Exception:
+            continue
     return None
 
-# 木取図のタイトル・部材名に使う日本語フォント（パス指定で確実に表示）
-_jp_font = _get_japanese_font()
+# 図中のテキストで必ず使うフォント（パス指定で確実に表示）
+_jp_font = _setup_japanese_font()
 
 # --- 背景画像 & 視認性100% 白背景CSS ---
 def set_design_theme(image_file):
@@ -195,17 +197,17 @@ def render_sheet_to_png_bytes(sheet, v_w_full, v_h_full, label):
     ax.set_ylim(0, v_h_full)
     ax.set_aspect("equal")
     ax.add_patch(patches.Rectangle((0, 0), v_w_full, v_h_full, fc="#fdf5e6", ec="#8b4513", lw=2))
-    kw_title = {"fontsize": 10, "fontweight": "bold"}
+    kw_t = {"fontsize": 10, "fontweight": "bold"}
     if _jp_font is not None:
-        kw_title["fontproperties"] = _jp_font
-    ax.set_title(f"【木取り図】 ID:{sheet['id']} ({label}：{int(v_w_full)}x{int(v_h_full)})", **kw_title)
-    kw_text = {"ha": "center", "va": "center", "fontsize": 6, "fontweight": "bold"}
+        kw_t["fontproperties"] = _jp_font
+    ax.set_title(f"【木取り図】 ID:{sheet['id']} ({label}：{int(v_w_full)}x{int(v_h_full)})", **kw_t)
+    kw_txt = {"ha": "center", "va": "center", "fontsize": 6, "fontweight": "bold"}
     if _jp_font is not None:
-        kw_text["fontproperties"] = _jp_font
+        kw_txt["fontproperties"] = _jp_font
     for r in sheet["rows"]:
         for p in r["parts"]:
             ax.add_patch(patches.Rectangle((p["x"], p["y"]), p["w"], p["h"], lw=1, ec="black", fc="#deb887", alpha=0.8))
-            ax.text(p["x"] + p["w"] / 2, p["y"] + p["h"] / 2, f"{p['n']}\n{int(p['w'])}x{int(p['h'])}", **kw_text)
+            ax.text(p["x"] + p["w"] / 2, p["y"] + p["h"] / 2, f"{p['n']}\n{int(p['w'])}x{int(p['h'])}", **kw_txt)
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
     plt.close(fig)
