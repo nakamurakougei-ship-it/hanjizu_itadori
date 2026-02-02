@@ -32,16 +32,14 @@ plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
 
 def _setup_japanese_font():
-    """Windows の MS ゴシック等をパスで登録し、Matplotlib で日本語が描画されるようにする。
-    木取図は PNG 画像なので、図中の文字は Matplotlib のフォントで描画される。
-    戻り値: 使う FontProperties（パス指定）。登録に失敗したら None。"""
-    windir = os.environ.get("SystemRoot", os.environ.get("WINDIR", "C:\\Windows"))
-    fonts_dir = os.path.join(windir, "Fonts")
-    candidates = ["msgothic.ttc", "msmincho.ttc", "meiryo.ttc", "yugothm.ttc"]
-    for fname in candidates:
-        path = os.path.join(fonts_dir, fname)
-        if not os.path.isfile(path):
-            continue
+    """木取図（PNG）内の日本語を表示するフォントを用意する。
+    1) アプリ同梱: リポジトリの font/IPAexGothic.ttf（GitHub・クラウドで必須）
+    2) Linux: サーバーに入っている Noto CJK 等
+    3) Windows: C:\\Windows\\Fonts の MS ゴシック等
+    戻り値: FontProperties（パス指定）。見つからなければ None。"""
+    def try_path(path):
+        if not path or not os.path.isfile(path):
+            return None
         try:
             if hasattr(fm.fontManager, "addfont"):
                 fm.fontManager.addfont(path)
@@ -53,7 +51,41 @@ def _setup_japanese_font():
             plt.rcParams["font.family"] = "sans-serif"
             return prop
         except Exception:
-            continue
+            return None
+
+    # 1) リポジトリに同梱したフォント（GitHub プッシュ → クラウドで動く場合はここが有効）
+    # IPAex Ver.004.01 のゴシックは ipaexg.ttf、旧表記は IPAexGothic.ttf
+    app_fonts = [
+        os.path.join(_root, "font", "ipaexg.ttf"),
+        os.path.join(_root, "font", "IPAexGothic.ttf"),
+        os.path.join(_root, "fonts", "ipaexg.ttf"),
+        os.path.join(_root, "fonts", "IPAexGothic.ttf"),
+        os.path.join(_root, "ipaexg.ttf"),
+        os.path.join(_root, "IPAexGothic.ttf"),
+    ]
+    for path in app_fonts:
+        prop = try_path(path)
+        if prop is not None:
+            return prop
+
+    # 2) Linux（Streamlit Cloud 等）でよくあるパス
+    linux_fonts = [
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/fonts-japanese-gothic/ttf/IPAexGothic.ttf",
+    ]
+    for path in linux_fonts:
+        prop = try_path(path)
+        if prop is not None:
+            return prop
+
+    # 3) Windows の標準フォント（PC で streamlit run する場合）
+    windir = os.environ.get("SystemRoot", os.environ.get("WINDIR", "C:\\Windows"))
+    fonts_dir = os.path.join(windir, "Fonts")
+    for fname in ["msgothic.ttc", "msmincho.ttc", "meiryo.ttc", "yugothm.ttc"]:
+        prop = try_path(os.path.join(fonts_dir, fname))
+        if prop is not None:
+            return prop
+
     return None
 
 # 図中のテキストで必ず使うフォント（パス指定で確実に表示）
