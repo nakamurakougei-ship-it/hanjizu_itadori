@@ -197,28 +197,57 @@ inject_table_white_bg(st)
 set_design_theme("itadori.jpg")
 
 # --- 2. 木取りエンジン (TrunkTechEngine) ---
+def _normalize_part(p):
+    """長方形部品は定尺板の長手方向に長辺を沿わせるため、w=長辺・d=短辺に正規化する。"""
+    w, d = p["w"], p["d"]
+    return {**p, "w": max(w, d), "d": min(w, d)}
+
+
 class TrunkTechEngine:
     def __init__(self, kerf: float = 3.0):
         self.kerf = kerf
+
     def pack_sheets(self, parts, vw, vh):
-        sorted_parts = sorted(parts, key=lambda x: (x['w'], x['d']), reverse=True)
+        """
+        定尺板 vw(長手) x vh(短手) に部品を配置する。
+        長方形部品は必ず長辺を長手方向(vw)に、短辺を短手方向(vh)に配置する。
+        定尺を超える部品は配置しない。
+        """
+        normalized = [_normalize_part(dict(p)) for p in parts]
+        valid = [p for p in normalized if p["w"] <= vw and p["d"] <= vh]
+        if len(valid) < len(normalized):
+            # 定尺を超える部品は除外（UIで警告するため件数を返せるようにする場合は呼び出し元で対応）
+            pass
+        sorted_parts = sorted(valid, key=lambda x: (x["w"], x["d"]), reverse=True)
         sheets = []
+
         def pack(p):
             for s in sheets:
-                for r in s['rows']:
-                    if r['h'] >= p['d'] and (vw - r['used_w']) >= p['w']:
-                        r['parts'].append({'n': p['n'], 'x': r['used_w'], 'y': r['y'], 'w': p['w'], 'h': p['d']})
-                        r['used_w'] += p['w'] + self.kerf; return True
-                if (vh - s['used_h']) >= p['d']:
-                    s['rows'].append({'y': s['used_h'], 'h': p['d'], 'used_w': p['w'] + self.kerf, 
-                                      'parts': [{'n': p['n'], 'x': 0, 'y': s['used_h'], 'w': p['w'], 'h': p['d']}]})
-                    s['used_h'] += p['d'] + self.kerf; return True
+                for r in s["rows"]:
+                    if r["h"] >= p["d"] and (vw - r["used_w"]) >= p["w"]:
+                        r["parts"].append({"n": p["n"], "x": r["used_w"], "y": r["y"], "w": p["w"], "h": p["d"]})
+                        r["used_w"] += p["w"] + self.kerf
+                        return True
+                if (vh - s["used_h"]) >= p["d"]:
+                    s["rows"].append({
+                        "y": s["used_h"], "h": p["d"], "used_w": p["w"] + self.kerf,
+                        "parts": [{"n": p["n"], "x": 0, "y": s["used_h"], "w": p["w"], "h": p["d"]}],
+                    })
+                    s["used_h"] += p["d"] + self.kerf
+                    return True
             return False
+
         for p in sorted_parts:
             if not pack(p):
-                sheets.append({'id': len(sheets)+1, 'used_h': p['d'] + self.kerf, 
-                               'rows': [{'y': 0, 'h': p['d'], 'used_w': p['w'] + self.kerf, 
-                                         'parts': [{'n': p['n'], 'x': 0, 'y': 0, 'w': p['w'], 'h': p['d']}]}]})
+                if p["w"] <= vw and p["d"] <= vh:
+                    sheets.append({
+                        "id": len(sheets) + 1,
+                        "used_h": p["d"] + self.kerf,
+                        "rows": [{
+                            "y": 0, "h": p["d"], "used_w": p["w"] + self.kerf,
+                            "parts": [{"n": p["n"], "x": 0, "y": 0, "w": p["w"], "h": p["d"]}],
+                        }],
+                    })
         return sheets
 
 
@@ -368,10 +397,13 @@ with col_main:
                 del st.session_state["diagram_result"]
         else:
             engine = TrunkTechEngine(kerf=kerf)
-            # 板寸法は鼻切り分のみ控え（-2mm）にしてネスティング余裕を確保（-10だと3×6で幅方向に積めない）
-            s36_dim = (v36 - 2, h36 - 2, "3x6")
-            s48_dim = (v48 - 2, h48 - 2, "4x8")
-            s_lam_dim = (float(lam_l) - 2, float(lam_w) - 2, "集成材")
+            # 板寸法は鼻切り分のみ控え（-2mm）。定尺は常に (長手, 短手) で渡す
+            def as_long_short(a, b, lab):
+                lo, sh = max(a, b), min(a, b)
+                return (lo - 2, sh - 2, lab)
+            s36_dim = as_long_short(v36, h36, "3x6")
+            s48_dim = as_long_short(v48, h48, "4x8")
+            s_lam_dim = as_long_short(float(lam_l), float(lam_w), "集成材")
             sim_results = []
             if "自動" in size_choice:
                 test_modes = [s36_dim, s48_dim, s_lam_dim]
@@ -382,21 +414,37 @@ with col_main:
             elif "集成材" in size_choice:
                 test_modes = [s_lam_dim]
             else:
-                test_modes = [(manual_w - 2, manual_h - 2, "手動")]
+                test_modes = [as_long_short(manual_w, manual_h, "手動")]
+            n_requested = len(all_parts)
             for vw, vh, label in test_modes:
                 sheets = engine.pack_sheets(all_parts, vw, vh)
+                total_placed = sum(len(r["parts"]) for s in sheets for r in s["rows"])
                 total_area = len(sheets) * (vw * vh)
                 sim_results.append({
                     "label": label, "sheets": sheets, "sheet_count": len(sheets),
-                    "vw": vw, "vh": vh, "score": total_area
+                    "vw": vw, "vh": vh, "score": total_area,
+                    "total_parts_placed": total_placed,
                 })
-            # 枚数優先、同枚数なら面積が小さい板を選択（3×6を優先）
-            best = min(sim_results, key=lambda x: (x["sheet_count"], x["score"]))
+            # 全部品を配置できる結果を優先し、その中で枚数優先・同枚数なら面積が小さい板を選択
+            best = min(
+                sim_results,
+                key=lambda x: (
+                    0 if x["total_parts_placed"] == n_requested else 1,  # 全配置を最優先
+                    -x["total_parts_placed"],  # 多く配置できているほど良い
+                    x["sheet_count"],
+                    x["score"],
+                ),
+            )
+            best["total_parts_requested"] = n_requested
             st.session_state["diagram_result"] = best
 
     if "diagram_result" in st.session_state:
         best = st.session_state["diagram_result"]
-        st.success(f"💡 木取り完了：**{best['label']}板** を **{best['sheet_count']}枚** 使用します。")
+        total_placed = best.get("total_parts_placed", 0)
+        total_req = best.get("total_parts_requested", total_placed)
+        st.success(f"💡 木取り完了：**{best['label']}板** を **{best['sheet_count']}枚** 使用し、**{total_placed}個** の部品を配置しました。")
+        if total_req > 0 and total_placed < total_req:
+            st.warning("一部の部品は定尺に収まらなかったため配置していません。板サイズを大きくするか、部品寸法を確認してください。")
         # A4に3枚/ページの印刷用HTMLダウンロード
         print_html = build_print_html(best)
         st.download_button(
