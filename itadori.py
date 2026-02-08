@@ -345,17 +345,7 @@ with col_main:
         lam_l = st.number_input("集成材 長さ (mm)", value=3600, min_value=3000, max_value=4200, step=1, key="lam_l")
         
         st.divider()
-        size_choice = st.radio("板サイズの選定方法", ["自動選定 (効率優先)", "3x6固定", "4x8固定", "集成材", "手動入力"], key="size_choice")
-        
-        if size_choice == "集成材":
-            # 集成材は幅×長さ（縦＝長さ、横＝幅で木取り）
-            manual_w = float(lam_l)
-            manual_h = float(lam_w)
-        elif size_choice == "手動入力":
-            mc1, mc2 = st.columns(2)
-            manual_w = mc1.number_input("板長さ(手動)", value=1820, min_value=1, step=1)
-            manual_h = mc2.number_input("板巾(手動)", value=910, min_value=1, step=1)
-        
+        size_choice = st.radio("板サイズの選定方法", ["自動選定 (効率優先)", "3x6固定", "4x8固定", "集成材"], key="size_choice")
         kerf = st.number_input("刃物厚 (mm)", value=3.0, step=0.1)
 
     st.divider()
@@ -406,15 +396,13 @@ with col_main:
             s_lam_dim = as_long_short(float(lam_l), float(lam_w), "集成材")
             sim_results = []
             if "自動" in size_choice:
-                test_modes = [s36_dim, s48_dim, s_lam_dim]
+                test_modes = [s36_dim, s48_dim]  # 自動選定＝3×6 or 4×8 のどちらか効率の良い方
             elif "3x6" in size_choice:
                 test_modes = [s36_dim]
             elif "4x8" in size_choice:
                 test_modes = [s48_dim]
             elif "集成材" in size_choice:
                 test_modes = [s_lam_dim]
-            else:
-                test_modes = [as_long_short(manual_w, manual_h, "手動")]
             n_requested = len(all_parts)
             for vw, vh, label in test_modes:
                 sheets = engine.pack_sheets(all_parts, vw, vh)
